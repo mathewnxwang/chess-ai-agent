@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Game</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Chess Game</h1>
+        <div class="game-status" id="game-status">
+            White to move
+        </div>
+        <div class="chessboard" id="chessboard">
+            <!-- Chess board will be generated via JavaScript -->
+        </div>
+        <div class="controls">
+            <button id="reset-btn">New Game</button>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', path='/js/chessboard.js') }}"></script>
+</body>
+</html>
