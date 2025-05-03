@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chess Game</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <!-- chess.js -->
@@ -15,15 +21,57 @@
     <link rel="stylesheet" href="{{ url_for('static', path='/css/styles.css') }}">
 </head>
 <body>
-    <div class="container">
-        <h1>Chess Game</h1>
-        <div class="game-status" id="game-status">
-            White to move
-        </div>
-        <div id="board" class="chessboard"></div>
-        <div class="controls">
-            <button id="reset-btn">New Game</button>
-        </div>
+    <div class="app-container">
+        <header class="app-header">
+            <h1>Chess <span class="highlight">Master</span></h1>
+        </header>
+        
+        <main class="game-container">
+            <div class="game-info">
+                <div class="status-card">
+                    <div class="card-header">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Game Status</span>
+                    </div>
+                    <div class="card-content">
+                        <div class="status-badge" id="game-status">White to move</div>
+                    </div>
+                </div>
+                
+                <div class="controls-card">
+                    <div class="card-header">
+                        <i class="fas fa-gamepad"></i>
+                        <span>Controls</span>
+                    </div>
+                    <div class="card-content">
+                        <button id="reset-btn" class="btn btn-primary">
+                            <i class="fas fa-redo"></i> New Game
+                        </button>
+                        <button id="undo-btn" class="btn btn-secondary">
+                            <i class="fas fa-undo"></i> Undo
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="board-container">
+                <div id="board" class="chessboard"></div>
+            </div>
+            
+            <div class="move-history">
+                <div class="card-header">
+                    <i class="fas fa-history"></i>
+                    <span>Move History</span>
+                </div>
+                <div class="card-content">
+                    <div id="move-list" class="move-list"></div>
+                </div>
+            </div>
+        </main>
+        
+        <footer class="app-footer">
+            <p>Built with <i class="fas fa-heart"></i> using FastAPI, chess.js & chessboard.js</p>
+        </footer>
     </div>
 
     <!-- Custom JavaScript -->
