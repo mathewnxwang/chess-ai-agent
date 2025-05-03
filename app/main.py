@@ -3,7 +3,12 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+import logging
+
+# Configure logging to see detailed errors
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -15,14 +20,11 @@ templates = Jinja2Templates(directory="app/templates")
 
 # Define request model for move
 class MoveRequest(BaseModel):
-    from_: str = None
-    to: str = None
-
+    from_square: str = Field(alias="from")
+    to_square: str = Field(alias="to")
+    
     class Config:
-        # Allow from field to be mapped from "from" in JSON
-        fields = {
-            'from_': 'from'
-        }
+        validate_by_name = True
 
 # Global game state
 board = chess.Board()
@@ -47,15 +49,21 @@ async def get_board():
 @app.post("/move")
 async def make_move(move_request: MoveRequest):
     try:
+        # Log the received request for debugging
+        logger.debug(f"Received move request: {move_request}")
+        
         # Get the move from the request
-        from_square = move_request.from_
-        to_square = move_request.to
+        from_square = move_request.from_square
+        to_square = move_request.to_square
+        
+        logger.debug(f"Attempting move from {from_square} to {to_square}")
         
         # Create the move
         move = chess.Move.from_uci(f"{from_square}{to_square}")
         
         # Check if the move is legal
         if move not in board.legal_moves:
+            logger.warning(f"Illegal move attempted: {from_square}{to_square}")
             return JSONResponse(
                 status_code=400,
                 content={"error": "Illegal move", "fen": board.fen()}
@@ -63,6 +71,7 @@ async def make_move(move_request: MoveRequest):
         
         # Make the move
         board.push(move)
+        logger.debug(f"Move completed: {from_square}{to_square}")
         
         # Return the updated board state
         return {
@@ -74,6 +83,7 @@ async def make_move(move_request: MoveRequest):
             "result": board.result() if board.is_game_over() else None
         }
     except Exception as e:
+        logger.exception(f"Error in make_move: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/reset")

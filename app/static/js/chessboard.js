@@ -1,191 +1,105 @@
-document.addEventListener('DOMContentLoaded', function() {
-    const chessboard = document.getElementById('chessboard');
-    const gameStatus = document.getElementById('game-status');
-    const resetBtn = document.getElementById('reset-btn');
+$(document).ready(function() {
+    // DOM elements
+    const $board = $('#board');
+    const $gameStatus = $('#game-status');
+    const $resetBtn = $('#reset-btn');
     
-    // Chess piece Unicode symbols
-    const pieceSymbols = {
-        'p': '♟', // black pawn
-        'n': '♞', // black knight
-        'b': '♝', // black bishop
-        'r': '♜', // black rook
-        'q': '♛', // black queen
-        'k': '♚', // black king
-        'P': '♙', // white pawn
-        'N': '♘', // white knight
-        'B': '♗', // white bishop
-        'R': '♖', // white rook
-        'Q': '♕', // white queen
-        'K': '♔'  // white king
+    // Initialize the chess.js instance
+    let game = new Chess();
+    
+    // Board configuration
+    const config = {
+        draggable: true,
+        position: 'start',
+        // Use piece theme from CDN directly
+        pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
+        // Allow only legal moves
+        onDragStart: onDragStart,
+        onDrop: onDrop,
+        onSnapEnd: onSnapEnd
     };
     
-    // Game state
-    let boardState = null;
-    let selectedSquare = null;
-    let legalMoves = [];
+    // Initialize the board
+    let board = Chessboard('board', config);
     
-    // Create the chess board
-    function createBoard() {
-        chessboard.innerHTML = '';
+    // Only allow dragging player's own pieces
+    function onDragStart(source, piece, position, orientation) {
+        // Don't allow dragging if the game is over
+        if (game.game_over()) return false;
         
-        // Create 64 squares
-        for (let row = 0; row < 8; row++) {
-            for (let col = 0; col < 8; col++) {
-                const square = document.createElement('div');
-                square.classList.add('square');
-                
-                // Alternate colors
-                if ((row + col) % 2 === 0) {
-                    square.classList.add('white');
-                } else {
-                    square.classList.add('black');
-                }
-                
-                // Set data attributes for position
-                const file = String.fromCharCode(97 + col); // a, b, c, ..., h
-                const rank = 8 - row; // 8, 7, 6, ..., 1
-                square.dataset.position = file + rank;
-                
-                // Add click event
-                square.addEventListener('click', handleSquareClick);
-                
-                chessboard.appendChild(square);
-            }
+        // Only allow white to move when it's white's turn
+        if (game.turn() === 'w' && piece.search(/^b/) !== -1) {
+            return false;
+        }
+        
+        // Only allow black to move when it's black's turn
+        if (game.turn() === 'b' && piece.search(/^w/) !== -1) {
+            return false;
+        }
+        
+        // Only allow white pieces to be moved initially (user always starts as white)
+        if (!game.history().length && piece.search(/^b/) !== -1) {
+            return false;
         }
     }
     
-    // Update the board based on FEN string
-    function updateBoard(fen) {
-        const fenParts = fen.split(' ');
-        const position = fenParts[0];
-        const rows = position.split('/');
+    // Handle piece drops
+    function onDrop(source, target) {
+        // Check if the move is legal
+        const move = game.move({
+            from: source,
+            to: target,
+            promotion: 'q' // Always promote to queen for simplicity
+        });
         
-        // Clear all pieces
-        document.querySelectorAll('.piece').forEach(piece => piece.remove());
-        
-        // Add pieces based on FEN
-        let rank = 8;
-        for (const row of rows) {
-            let file = 0;
-            for (const char of row) {
-                if (!isNaN(char)) {
-                    // Skip empty squares
-                    file += parseInt(char);
-                } else {
-                    // Add piece
-                    const square = document.querySelector(`[data-position="${String.fromCharCode(97 + file)}${rank}"]`);
-                    const piece = document.createElement('div');
-                    piece.classList.add('piece');
-                    piece.textContent = pieceSymbols[char];
-                    piece.dataset.piece = char;
-                    
-                    // Add piece image if using CSS for pieces
-                    const isWhite = char === char.toUpperCase();
-                    const pieceType = char.toLowerCase();
-                    piece.classList.add(isWhite ? 'white-piece' : 'black-piece');
-                    piece.classList.add(`${pieceType}-piece`);
-                    
-                    square.appendChild(piece);
-                    file++;
-                }
-            }
-            rank--;
-        }
+        // If the move is illegal, return the piece to its source
+        if (move === null) return 'snapback';
         
         // Update game status
-        const turn = fenParts[1] === 'w' ? 'White' : 'Black';
-        gameStatus.textContent = `${turn} to move`;
-
-        // Check for game over conditions
-        if (boardState && boardState.is_checkmate) {
-            const winner = turn === 'White' ? 'Black' : 'White';
-            gameStatus.textContent = `Checkmate! ${winner} wins!`;
-        } else if (boardState && boardState.is_check) {
-            gameStatus.textContent = `${turn} is in check!`;
-        } else if (boardState && boardState.is_game_over) {
-            gameStatus.textContent = 'Game over! ' + (boardState.result || 'Draw');
-        }
+        updateStatus();
+        
+        // If the move was successful, send it to the server
+        sendMoveToServer(source, target);
     }
     
-    // Handle square click
-    function handleSquareClick(event) {
-        const square = event.currentTarget;
-        const position = square.dataset.position;
+    // Update the board position after the piece snap animation
+    function onSnapEnd() {
+        board.position(game.fen());
+    }
+    
+    // Update the game status element
+    function updateStatus() {
+        let status = '';
         
-        // If no square is selected and the clicked square has a piece
-        if (!selectedSquare && square.querySelector('.piece')) {
-            // Only allow selecting white pieces on first move
-            const piece = square.querySelector('.piece').dataset.piece;
-            const isWhitePiece = /[PNBRQK]/.test(piece);
-            
-            if (boardState && boardState.fen.includes(' b ') && isWhitePiece) {
-                return; // Can't select white pieces on black's turn
-            }
-            
-            if (boardState && boardState.fen.includes(' w ') && !isWhitePiece) {
-                return; // Can't select black pieces on white's turn
-            }
-            
-            // Select the square
-            selectedSquare = position;
-            square.classList.add('selected');
-            
-            // Highlight legal moves
-            highlightLegalMoves(position);
+        // Check if it's checkmate
+        if (game.in_checkmate()) {
+            const winner = game.turn() === 'w' ? 'Black' : 'White';
+            status = `Checkmate! ${winner} wins!`;
         } 
-        // If a square is already selected
-        else if (selectedSquare) {
-            // If same square is clicked, deselect it
-            if (selectedSquare === position) {
-                deselectSquare();
-                return;
-            }
-            
-            // Try to make a move
-            makeMove(selectedSquare, position);
+        // Check if it's a draw
+        else if (game.in_draw()) {
+            status = 'Game over! Draw!';
         }
-    }
-    
-    // Highlight legal moves
-    function highlightLegalMoves(position) {
-        // Clear previous highlights
-        document.querySelectorAll('.valid-move').forEach(square => {
-            square.classList.remove('valid-move');
-        });
-        
-        if (!boardState || !boardState.legal_moves) return;
-        
-        // Find moves that start from the selected position
-        const legalMovesFromPosition = boardState.legal_moves.filter(move => 
-            move.startsWith(position)
-        );
-        
-        // Highlight destination squares
-        legalMovesFromPosition.forEach(move => {
-            const destination = move.substring(2, 4);
-            const square = document.querySelector(`[data-position="${destination}"]`);
-            if (square) {
-                square.classList.add('valid-move');
-            }
-        });
-    }
-    
-    // Deselect the currently selected square
-    function deselectSquare() {
-        if (selectedSquare) {
-            document.querySelector(`[data-position="${selectedSquare}"]`).classList.remove('selected');
-            selectedSquare = null;
+        // Game still going
+        else {
+            const turn = game.turn() === 'w' ? 'White' : 'Black';
+            status = `${turn} to move`;
             
-            // Remove move highlights
-            document.querySelectorAll('.valid-move').forEach(square => {
-                square.classList.remove('valid-move');
-            });
+            // Check if in check
+            if (game.in_check()) {
+                status += ` (${turn} is in check!)`;
+            }
         }
+        
+        $gameStatus.text(status);
     }
     
-    // Make a move
-    async function makeMove(from, to) {
+    // Send move to server to update backend state
+    async function sendMoveToServer(from, to) {
         try {
+            // Log the data being sent to the server
+            console.log('Sending move to server:', { from, to });
+            
             const response = await fetch('/move', {
                 method: 'POST',
                 headers: {
@@ -197,65 +111,58 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
             });
             
+            if (!response.ok) {
+                // Log the response for debugging
+                const errorText = await response.text();
+                console.error('Server error response:', errorText);
+                throw new Error(`Server returned ${response.status}: ${errorText}`);
+            }
+            
             const data = await response.json();
             
             if (data.error) {
                 console.error(data.error);
-                // Show error in game status
-                gameStatus.textContent = data.error;
-            } else {
-                // Update board state
-                boardState = data;
-                updateBoard(data.fen);
+                $gameStatus.text(data.error);
             }
-            
-            // Deselect square after move attempt
-            deselectSquare();
-            
         } catch (error) {
-            console.error('Error making move:', error);
-            gameStatus.textContent = 'Error making move. Please try again.';
-            deselectSquare();
+            console.error('Error sending move to server:', error);
+            $gameStatus.text('Error communicating with server. The game may be out of sync.');
         }
     }
     
-    // Reset the board
-    async function resetBoard() {
+    // Reset the game
+    async function resetGame() {
         try {
+            // Reset client-side game state
+            game = new Chess();
+            board.position('start');
+            updateStatus();
+            
+            // Reset server-side game state
             const response = await fetch('/reset', {
                 method: 'POST'
             });
             
             const data = await response.json();
-            boardState = data;
-            updateBoard(data.fen);
-            deselectSquare();
             
+            if (data.error) {
+                console.error(data.error);
+                $gameStatus.text(data.error);
+            }
         } catch (error) {
-            console.error('Error resetting board:', error);
-            gameStatus.textContent = 'Error resetting board. Please refresh the page.';
+            console.error('Error resetting game on server:', error);
+            $gameStatus.text('Error resetting game on server. Please refresh the page.');
         }
     }
     
-    // Initialize the board
-    async function initBoard() {
-        createBoard();
-        
-        try {
-            const response = await fetch('/board');
-            const data = await response.json();
-            boardState = data;
-            updateBoard(data.fen);
-            
-        } catch (error) {
-            console.error('Error initializing board:', error);
-            gameStatus.textContent = 'Error loading chess board. Please refresh the page.';
-        }
-    }
+    // Add resize event to make the board responsive
+    $(window).resize(function() {
+        board.resize();
+    });
     
-    // Add event listener for the reset button
-    resetBtn.addEventListener('click', resetBoard);
+    // Add reset button event listener
+    $resetBtn.on('click', resetGame);
     
-    // Initialize the board
-    initBoard();
+    // Initialize game status
+    updateStatus();
 });

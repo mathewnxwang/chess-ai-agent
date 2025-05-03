@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chess Game</title>
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- chess.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <!-- chessboard.js -->
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+    <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', path='/css/styles.css') }}">
 </head>
 <body>
@@ -12,14 +20,13 @@
         <div class="game-status" id="game-status">
             White to move
         </div>
-        <div class="chessboard" id="chessboard">
-            <!-- Chess board will be generated via JavaScript -->
-        </div>
+        <div id="board" class="chessboard"></div>
         <div class="controls">
             <button id="reset-btn">New Game</button>
         </div>
     </div>
 
+    <!-- Custom JavaScript -->
     <script src="{{ url_for('static', path='/js/chessboard.js') }}"></script>
 </body>
 </html>
