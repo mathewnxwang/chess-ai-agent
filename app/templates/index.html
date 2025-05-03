@@ -52,6 +52,37 @@
                         </button>
                     </div>
                 </div>
+                
+                <div class="ai-settings-card">
+                    <div class="card-header">
+                        <i class="fas fa-robot"></i>
+                        <span>Stockfish Settings</span>
+                    </div>
+                    <div class="card-content">
+                        <div class="setting-group">
+                            <label for="skill-level">Skill Level:</label>
+                            <select id="skill-level" class="setting-input">
+                                <option value="1">Beginner (1)</option>
+                                <option value="5" selected>Casual (5)</option>
+                                <option value="10">Intermediate (10)</option>
+                                <option value="15">Advanced (15)</option>
+                                <option value="20">Master (20)</option>
+                            </select>
+                        </div>
+                        <div class="setting-group">
+                            <label for="search-depth">Search Depth:</label>
+                            <select id="search-depth" class="setting-input">
+                                <option value="5">Quick (5)</option>
+                                <option value="10" selected>Normal (10)</option>
+                                <option value="15">Deep (15)</option>
+                                <option value="20">Very Deep (20)</option>
+                            </select>
+                        </div>
+                        <button id="apply-settings" class="btn btn-primary">
+                            <i class="fas fa-check"></i> Apply Settings
+                        </button>
+                    </div>
+                </div>
             </div>
             
             <div class="board-container">
@@ -70,7 +101,7 @@
         </main>
         
         <footer class="app-footer">
-            <p>Built with <i class="fas fa-heart"></i> using FastAPI, chess.js & chessboard.js</p>
+            <p>Built with <i class="fas fa-heart"></i> using FastAPI, chess.js, chessboard.js & Stockfish</p>
         </footer>
     </div>
 

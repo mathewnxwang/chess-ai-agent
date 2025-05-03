@@ -1,16 +1,17 @@
-# Chess Master
+# Chess Master with Stockfish AI
 
-A modern, sleek web-based chess game built with Python FastAPI, chess.js, and chessboard.js. The chess logic is handled by the Python-chess library on the backend and chess.js on the frontend, while chessboard.js provides an interactive chessboard interface.
+A modern, sleek web-based chess game built with Python FastAPI, chess.js, chessboard.js, and Stockfish. The chess logic is handled by python-chess on the backend and chess.js on the frontend, while Stockfish provides AI opponent capabilities.
 
 ## Features
 
+- Play against Stockfish chess engine (user plays as white)
+- Adjustable AI difficulty levels and search depth
 - Modern UI with sleek design and animations
 - Interactive chess board with drag-and-drop moves
 - Legal move validation and move highlighting
 - Game state tracking (check, checkmate, draw)
 - Move history with standard algebraic notation
 - Last move highlighting
-- Player always starts as white
 - Undo move functionality
 - New game / reset functionality
 - Fully responsive design for all devices
@@ -20,6 +21,7 @@ A modern, sleek web-based chess game built with Python FastAPI, chess.js, and ch
 
 - Python 3.11+
 - Poetry (Python package manager)
+- Stockfish chess engine
 
 ## Installation
 
@@ -32,6 +34,11 @@ cd chess-ai-agent
 2. Install dependencies using Poetry:
 ```bash
 poetry install
+```
+
+3. Make sure you have Stockfish installed and update the path in `app/main.py`:
+```python
+stockfish_path = r"path/to/your/stockfish"
 ```
 
 ## Running the Application
@@ -57,14 +64,33 @@ http://localhost:8000
 
 ## How to Play
 
-1. The game starts with white (you) to move
+1. The game starts with you playing as white
 2. Drag and drop pieces to make moves
-3. Invalid moves will automatically snap back
-4. The last move made is highlighted on the board
-5. Move history is displayed on the right side
-6. Status indicators show whose turn it is and game state
-7. "Undo" button allows you to take back the last move
-8. "New Game" button resets the board at any time
+3. Stockfish will automatically respond with black's moves
+4. Invalid moves will automatically snap back
+5. The last move made is highlighted on the board
+6. Move history is displayed on the right side
+7. Status indicators show whose turn it is and game state
+8. "Undo" button allows you to take back moves
+9. "New Game" button resets the board at any time
+10. Adjust Stockfish difficulty in the "Stockfish Settings" panel
+
+## AI Difficulty Settings
+
+You can customize Stockfish's playing strength:
+
+- **Skill Level**: Controls how strong the AI plays (1-20)
+  - Beginner (1): Very weak play suitable for beginners
+  - Casual (5): Moderate play with occasional mistakes
+  - Intermediate (10): Solid play with fewer mistakes
+  - Advanced (15): Strong play, challenging for most players
+  - Master (20): Very strong play, challenging even for advanced players
+
+- **Search Depth**: Controls how deeply Stockfish analyzes positions
+  - Quick (5): Fast response times but less accurate analysis
+  - Normal (10): Balanced between speed and accuracy
+  - Deep (15): More accurate but slower response
+  - Very Deep (20): Most accurate but slowest response
 
 ## UI Features
 
@@ -81,7 +107,7 @@ http://localhost:8000
 ```
 chess-ai-agent/
 ├── app/
-│   ├── main.py            # FastAPI backend with Python-chess
+│   ├── main.py            # FastAPI backend with Python-chess and Stockfish integration
 │   ├── static/
 │   │   ├── css/
 │   │   │   └── styles.css # Modern styling for the chess board and UI
@@ -97,6 +123,7 @@ chess-ai-agent/
 ## Technologies Used
 
 - **Backend**: Python with FastAPI, Python-chess
+- **AI Engine**: Stockfish chess engine
 - **Frontend**: HTML, CSS, JavaScript
 - **Chess Libraries**: 
   - [chessboard.js](https://chessboardjs.com/) - JavaScript chessboard UI

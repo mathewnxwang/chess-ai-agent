@@ -106,7 +106,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Cards */
-.status-card, .controls-card, .move-history, .board-container {
+.status-card, .controls-card, .move-history, .board-container, .ai-settings-card {
     background-color: var(--white);
     border-radius: var(--border-radius);
     box-shadow: var(--box-shadow);
@@ -114,7 +114,7 @@ h1, h2, h3, h4, h5, h6 {
     transition: var(--transition);
 }
 
-.status-card:hover, .controls-card:hover, .move-history:hover {
+.status-card:hover, .controls-card:hover, .move-history:hover, .ai-settings-card:hover {
     transform: translateY(-5px);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
@@ -212,6 +212,39 @@ h1, h2, h3, h4, h5, h6 {
     gap: 10px;
 }
 
+/* AI Settings */
+.ai-settings-card .card-header {
+    background-color: var(--accent-color);
+}
+
+.setting-group {
+    margin-bottom: 12px;
+}
+
+.setting-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+.setting-input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    background-color: var(--white);
+    font-family: inherit;
+    font-size: 1rem;
+    color: var(--text-dark);
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.setting-input:focus {
+    border-color: var(--primary-color);
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(74, 110, 176, 0.25);
+}
+
 /* Buttons */
 .btn {
     display: inline-flex;
@@ -291,6 +324,17 @@ h1, h2, h3, h4, h5, h6 {
 
 .btn-secondary:active {
     transform: translateY(0);
+}
+
+/* Apply settings button */
+#apply-settings {
+    margin-top: 10px;
+    width: 100%;
+    background-color: var(--accent-color);
+}
+
+#apply-settings:hover {
+    background-color: #e5aa00;
 }
 
 /* Chessboard */

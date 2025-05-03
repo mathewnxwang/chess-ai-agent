@@ -5,11 +5,15 @@ $(document).ready(function() {
     const $resetBtn = $('#reset-btn');
     const $undoBtn = $('#undo-btn');
     const $moveList = $('#move-list');
+    const $skillLevel = $('#skill-level');
+    const $searchDepth = $('#search-depth');
+    const $applySettings = $('#apply-settings');
     
     // Game state
     let game = new Chess();
     let moveHistory = [];
     let lastMove = null;
+    let boardUpdateInterval = null;
     
     // Board configuration
     const config = {
@@ -27,6 +31,62 @@ $(document).ready(function() {
     // Initialize the board
     let board = Chessboard('board', config);
     
+    // These functions are no longer needed as AI moves are made immediately
+    // and returned in the response to the user's move
+    function startPolling() {
+        // No longer needed - AI moves immediately
+        console.log("Polling no longer needed - AI moves immediately");
+    }
+    
+    function stopPolling() {
+        // Clean up any existing interval just in case
+        if (boardUpdateInterval) {
+            clearInterval(boardUpdateInterval);
+            boardUpdateInterval = null;
+        }
+    }
+    
+    // This function is kept for backwards compatibility but is no longer needed
+    async function checkForAiMove() {
+        console.log("Manual check for AI move - should not be needed");
+        try {
+            const response = await fetch('/board');
+            const data = await response.json();
+            
+            // Update the game state with the server state
+            game.load(data.fen);
+            updateBoardAfterServerMove(data);
+        } catch (error) {
+            console.error('Error checking for AI move:', error);
+        }
+    }
+    
+    // Helper function to update the board after receiving a move from the server
+    function updateBoardAfterServerMove(data) {
+        // Get the last move from the move stack
+        if (game.history().length > moveHistory.length) {
+            // Get the last move made
+            const moveObj = game.history({ verbose: true }).pop();
+            
+            if (moveObj) {
+                // Update last move for highlighting
+                lastMove = { from: moveObj.from, to: moveObj.to };
+                
+                // Add the move to our history
+                addMoveToHistory(moveObj);
+                
+                // Update the board
+                board.position(game.fen());
+                
+                // Highlight the move
+                highlightLastMove();
+                
+                // Update game status
+                updateStatus();
+            }
+        }
+    }
+    
     // Only allow dragging player's own pieces
     function onDragStart(source, piece, position, orientation) {
         // Don't allow dragging if the game is over
@@ -42,8 +102,8 @@ $(document).ready(function() {
             return false;
         }
         
-        // Only allow white pieces to be moved initially (user always starts as white)
-        if (!game.history().length && piece.search(/^b/) !== -1) {
+        // Only allow white pieces to be moved (user always plays as white)
+        if (piece.search(/^b/) !== -1) {
             return false;
         }
     }
@@ -69,8 +129,10 @@ $(document).ready(function() {
         // Update game status
         updateStatus();
         
-        // If the move was successful, send it to the server
+        // Send the move to the server - the AI's response will be handled in sendMoveToServer
         sendMoveToServer(source, target);
+        
+        // No need to poll - AI moves immediately and response is in sendMoveToServer
     }
     
     // Update the board position after the piece snap animation
@@ -183,7 +245,7 @@ $(document).ready(function() {
         }, 3000);
     }
     
-    // Send move to server to update backend state
+    // Send move to server to update backend state and get AI's response
     async function sendMoveToServer(from, to) {
         try {
             const response = await fetch('/move', {
@@ -208,6 +270,37 @@ $(document).ready(function() {
             if (data.error) {
                 console.error(data.error);
                 $gameStatus.text(data.error);
+            } else {
+                // Update game with server response (which now includes AI's move if made)
+                game.load(data.fen);
+                
+                // Only update UI if AI made a move (if length of move history changed)
+                if (game.history().length > moveHistory.length + 1) {
+                    // This means both player move and AI move are in the new FEN
+                    // First, get the last two moves
+                    const history = game.history({ verbose: true });
+                    const aiMove = history[history.length - 1];
+                    
+                    if (aiMove) {
+                        console.log('AI responded with move:', aiMove.san);
+                        
+                        // Update last move for highlighting (to the AI's move)
+                        lastMove = { from: aiMove.from, to: aiMove.to };
+                        
+                        // Add both moves to history
+                        // The player's move was already added in onDrop
+                        addMoveToHistory(aiMove);
+                        
+                        // Update the board to show the AI's move
+                        board.position(data.fen);
+                        
+                        // Highlight the AI's move
+                        highlightLastMove();
+                    }
+                }
+                
+                // Update game status after AI move
+                updateStatus();
             }
         } catch (error) {
             console.error('Error sending move to server:', error);
@@ -215,52 +308,104 @@ $(document).ready(function() {
         }
     }
     
-    // Undo the last move
-    function undoLastMove() {
-        if (moveHistory.length === 0) return;
-        
-        // Undo the move in the game
-        game.undo();
-        
-        // Remove the move from the history array
-        moveHistory.pop();
-        
-        // Update the board position
-        board.position(game.fen());
-        
-        // Update the move history display
-        $moveList.children().last().remove();
-        
-        // Update the last move highlight
-        if (moveHistory.length > 0) {
-            const lastMoveObj = moveHistory[moveHistory.length - 1];
-            lastMove = { from: lastMoveObj.from, to: lastMoveObj.to };
-            highlightLastMove();
-        } else {
-            lastMove = null;
-            $('.highlight-last-move').removeClass('highlight-last-move');
+    // Apply AI settings to the server
+    async function applyAiSettings() {
+        try {
+            const skillLevel = parseInt($skillLevel.val());
+            const searchDepth = parseInt($searchDepth.val());
+            
+            const response = await fetch('/set_ai_options', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    skill_level: skillLevel,
+                    depth: searchDepth,
+                    enabled: true
+                })
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Server error response:', errorText);
+                throw new Error(`Server returned ${response.status}: ${errorText}`);
+            }
+            
+            const data = await response.json();
+            console.log('AI settings updated:', data);
+            
+            // Show success indicator
+            $applySettings.html('<i class="fas fa-check"></i> Settings Applied');
+            
+            // Reset button text after 2 seconds
+            setTimeout(() => {
+                $applySettings.html('<i class="fas fa-check"></i> Apply Settings');
+            }, 2000);
+            
+        } catch (error) {
+            console.error('Error applying AI settings:', error);
+            $gameStatus.text('Error updating AI settings');
         }
-        
-        // Update the game status
-        updateStatus();
+    }
+    
+    // Undo the last move
+    async function undoLastMove() {
+        try {
+            const response = await fetch('/undo', {
+                method: 'POST'
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Server error response:', errorText);
+                throw new Error(`Server returned ${response.status}: ${errorText}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                console.error(data.error);
+                $gameStatus.text(data.error);
+            } else {
+                // Reset the client-side game state
+                game.load(data.fen);
+                
+                // Reset move history (simplest approach is to clear and rebuild from the game history)
+                moveHistory = [];
+                $moveList.empty();
+                
+                // Rebuild move history from game
+                const verboseMoves = game.history({ verbose: true });
+                verboseMoves.forEach(move => {
+                    addMoveToHistory(move);
+                });
+                
+                // Update the board position
+                board.position(game.fen());
+                
+                // Update last move highlight
+                if (verboseMoves.length > 0) {
+                    const lastMoveObj = verboseMoves[verboseMoves.length - 1];
+                    lastMove = { from: lastMoveObj.from, to: lastMoveObj.to };
+                    highlightLastMove();
+                } else {
+                    lastMove = null;
+                    $('.highlight-last-move').removeClass('highlight-last-move');
+                }
+                
+                // Update the game status
+                updateStatus();
+            }
+        } catch (error) {
+            console.error('Error undoing move:', error);
+            $gameStatus.text('Error undoing move');
+        }
     }
     
     // Reset the game
     async function resetGame() {
         try {
-            // Reset client-side game state
-            game = new Chess();
-            moveHistory = [];
-            lastMove = null;
-            
-            // Reset the UI
-            board.position('start');
-            $moveList.empty();
-            updateStatus();
-            
-            // Remove any highlights
-            $('.highlight-last-move').removeClass('highlight-last-move');
-            
             // Reset server-side game state
             const response = await fetch('/reset', {
                 method: 'POST'
@@ -271,6 +416,22 @@ $(document).ready(function() {
             if (data.error) {
                 console.error(data.error);
                 $gameStatus.text(data.error);
+            } else {
+                // Reset client-side game state
+                game = new Chess();
+                moveHistory = [];
+                lastMove = null;
+                
+                // Reset the UI
+                board.position('start');
+                $moveList.empty();
+                updateStatus();
+                
+                // Remove any highlights
+                $('.highlight-last-move').removeClass('highlight-last-move');
+                
+                // Stop polling if active
+                stopPolling();
             }
         } catch (error) {
             console.error('Error resetting game on server:', error);
@@ -286,7 +447,38 @@ $(document).ready(function() {
     // Add event listeners for buttons
     $resetBtn.on('click', resetGame);
     $undoBtn.on('click', undoLastMove);
+    $applySettings.on('click', applyAiSettings);
     
     // Initialize game status
     updateStatus();
+    
+    // Make sure the UI is in sync with the server on page load
+    fetch('/board')
+        .then(response => response.json())
+        .then(data => {
+            game.load(data.fen);
+            board.position(data.fen);
+            
+            // Rebuild move history if needed
+            if (game.history().length > 0) {
+                const verboseMoves = game.history({ verbose: true });
+                verboseMoves.forEach(move => {
+                    addMoveToHistory(move);
+                });
+                
+                const lastMoveObj = verboseMoves[verboseMoves.length - 1];
+                lastMove = { from: lastMoveObj.from, to: lastMoveObj.to };
+                highlightLastMove();
+            }
+            
+            updateStatus();
+            
+            // If it's black's turn, immediately fetch the latest board state
+            if (game.turn() === 'b' && !game.game_over()) {
+                checkForAiMove();  // This will just update the UI with the current state
+            }
+        })
+        .catch(error => {
+            console.error('Error getting initial board state:', error);
+        });
 });

@@ -1,10 +1,13 @@
 import chess
-from fastapi import FastAPI, Request, HTTPException
+import chess.engine
+import os
+import logging
+from typing import Optional
+from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
-import logging
 
 # Configure logging to see detailed errors
 logging.basicConfig(level=logging.DEBUG)
@@ -26,8 +29,103 @@ class MoveRequest(BaseModel):
     class Config:
         validate_by_name = True
 
-# Global game state
+# Game state
 board = chess.Board()
+engine: Optional[chess.engine.SimpleEngine] = None
+stockfish_path = "/Users/mathew.wang/Downloads/stockfish/stockfish-macos-m1-apple-silicon"
+ai_thinking = False
+AI_SKILL_LEVEL = 5   # Default skill level (1-20)
+AI_DEPTH = 10        # Default search depth
+AI_ENABLED = True    # Whether AI is enabled
+
+def initialize_engine():
+    """Initialize the chess engine."""
+    global engine
+    
+    if engine is not None:
+        return
+    
+    try:
+        # Start the engine with the specified path
+        engine = chess.engine.SimpleEngine.popen_uci(stockfish_path)
+        
+        # Set engine options for Stockfish
+        try:
+            engine.configure({"Skill Level": AI_SKILL_LEVEL})
+            logger.info(f"Stockfish initialized with skill level {AI_SKILL_LEVEL}")
+        except chess.engine.EngineError:
+            logger.warning("Engine doesn't support skill level configuration")
+        
+    except Exception as e:
+        logger.error(f"Error initializing Stockfish: {str(e)}")
+        engine = None
+
+def shutdown_engine():
+    """Shut down the chess engine."""
+    global engine
+    
+    if engine is not None:
+        engine.quit()
+        engine = None
+        logger.info("Stockfish engine shut down")
+
+def get_engine_move(board_state: chess.Board):
+    """Get a move from the chess engine."""
+    global engine, ai_thinking
+    
+    if engine is None:
+        initialize_engine()
+        if engine is None:
+            logger.error("No chess engine available")
+            return None
+    
+    try:
+        ai_thinking = True
+        logger.info("Stockfish thinking...")
+        
+        # Get the engine's move
+        result = engine.play(board_state, chess.engine.Limit(depth=AI_DEPTH))
+        move = result.move
+        
+        logger.info(f"Stockfish move: {move}")
+        ai_thinking = False
+        return move
+    
+    except Exception as e:
+        logger.error(f"Error getting Stockfish move: {str(e)}")
+        ai_thinking = False
+        return None
+
+def make_ai_move():
+    """Make an AI move immediately without delay."""
+    global board, ai_thinking
+    
+    if not AI_ENABLED or board.is_game_over():
+        return None
+    
+    ai_thinking = True
+    logger.debug("AI thinking...")
+    
+    # Get the AI move
+    move = get_engine_move(board)
+    
+    if move:
+        # Make the move on the board
+        board.push(move)
+        logger.info(f"Stockfish made move: {move.uci()}")
+    
+    ai_thinking = False
+    return move
+
+# Initialize engine when the app starts
+@app.on_event("startup")
+async def startup_event():
+    initialize_engine()
+
+# Shutdown engine when the app stops
+@app.on_event("shutdown")
+async def shutdown_event():
+    shutdown_engine()
 
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
@@ -43,11 +141,14 @@ async def get_board():
         "is_check": board.is_check(),
         "is_checkmate": board.is_checkmate(),
         "is_game_over": board.is_game_over(),
-        "result": board.result() if board.is_game_over() else None
+        "result": board.result() if board.is_game_over() else None,
+        "ai_thinking": ai_thinking
     }
 
 @app.post("/move")
-async def make_move(move_request: MoveRequest):
+async def make_move(move_request: MoveRequest, background_tasks: BackgroundTasks):
+    global board, ai_thinking
+    
     try:
         # Log the received request for debugging
         logger.debug(f"Received move request: {move_request}")
@@ -73,7 +174,67 @@ async def make_move(move_request: MoveRequest):
         board.push(move)
         logger.debug(f"Move completed: {from_square}{to_square}")
         
-        # Return the updated board state
+        # Check if it's black's turn now and the game is not over
+        if board.turn == chess.BLACK and not board.is_game_over() and AI_ENABLED:
+            # Set ai_thinking flag to true to indicate AI is thinking
+            ai_thinking = True
+            logger.debug("AI's turn - making move directly")
+            
+            # Make AI move directly instead of as a background task
+            if not board.is_game_over():
+                move = get_engine_move(board)
+                
+                if move:
+                    # Make the move on the board
+                    board.push(move)
+                    logger.info(f"Stockfish made move: {move.uci()}")
+            
+            # Reset ai_thinking flag
+            ai_thinking = False
+            
+            # Return the updated board state after AI move
+            return {
+                "fen": board.fen(),
+                "legal_moves": [move.uci() for move in board.legal_moves],
+                "is_check": board.is_check(),
+                "is_checkmate": board.is_checkmate(),
+                "is_game_over": board.is_game_over(),
+                "result": board.result() if board.is_game_over() else None,
+                "ai_thinking": False
+            }
+        
+        # Otherwise, just return the current board state
+        return {
+            "fen": board.fen(),
+            "legal_moves": [move.uci() for move in board.legal_moves],
+            "is_check": board.is_check(),
+            "is_checkmate": board.is_checkmate(),
+            "is_game_over": board.is_game_over(),
+            "result": board.result() if board.is_game_over() else None,
+            "ai_thinking": False
+        }
+    except Exception as e:
+        logger.exception(f"Error in make_move: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/undo")
+async def undo_last_move():
+    global board
+    
+    try:
+        # Undo the last two moves (player's move and AI's move)
+        if len(board.move_stack) >= 2 and AI_ENABLED:
+            board.pop()  # Remove AI's move
+            board.pop()  # Remove player's move
+        # If AI is disabled or there's only one move, just undo the last move
+        elif len(board.move_stack) >= 1:
+            board.pop()
+        else:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "No moves to undo"}
+            )
+        
         return {
             "fen": board.fen(),
             "legal_moves": [move.uci() for move in board.legal_moves],
@@ -83,12 +244,13 @@ async def make_move(move_request: MoveRequest):
             "result": board.result() if board.is_game_over() else None
         }
     except Exception as e:
-        logger.exception(f"Error in make_move: {str(e)}")
+        logger.exception(f"Error in undo_last_move: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/reset")
 async def reset_board():
     global board
+    
     board = chess.Board()
     return {
         "fen": board.fen(),
@@ -98,6 +260,42 @@ async def reset_board():
         "is_game_over": False,
         "result": None
     }
+
+@app.post("/set_ai_options")
+async def set_ai_options(options: dict):
+    global AI_SKILL_LEVEL, AI_DEPTH, AI_ENABLED, engine
+    
+    try:
+        # Update skill level if provided
+        if "skill_level" in options:
+            skill = int(options["skill_level"])
+            AI_SKILL_LEVEL = max(1, min(20, skill))  # Clamp between 1-20
+            
+            # Update engine if it's running
+            if engine is not None:
+                try:
+                    engine.configure({"Skill Level": AI_SKILL_LEVEL})
+                except chess.engine.EngineError:
+                    pass  # Engine might not support this option
+        
+        # Update depth if provided
+        if "depth" in options:
+            depth = int(options["depth"])
+            AI_DEPTH = max(1, min(20, depth))  # Clamp between 1-20
+        
+        # Update AI enabled state if provided
+        if "enabled" in options:
+            AI_ENABLED = bool(options["enabled"])
+        
+        return {
+            "skill_level": AI_SKILL_LEVEL,
+            "depth": AI_DEPTH,
+            "enabled": AI_ENABLED
+        }
+    
+    except Exception as e:
+        logger.exception(f"Error setting AI options: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
 
 # Run the app
 if __name__ == "__main__":
