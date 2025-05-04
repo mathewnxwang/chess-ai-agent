@@ -52,12 +52,12 @@ def initialize_engine():
         # Set engine options for Stockfish
         try:
             engine.configure({"Skill Level": AI_SKILL_LEVEL})
-            logger.info(f"Stockfish initialized with skill level {AI_SKILL_LEVEL}")
+            logger.info("Stockfish initialized with skill level %s", AI_SKILL_LEVEL)
         except chess.engine.EngineError:
             logger.warning("Engine doesn't support skill level configuration")
         
     except Exception as e:
-        logger.error(f"Error initializing Stockfish: {str(e)}")
+        logger.error("Error initializing Stockfish: %s", str(e))
         engine = None
 
 def shutdown_engine():
@@ -87,35 +87,14 @@ def get_engine_move(board_state: chess.Board):
         result = engine.play(board_state, chess.engine.Limit(depth=AI_DEPTH))
         move = result.move
         
-        logger.info(f"Stockfish move: {move}")
+        logger.info("Stockfish move: %s", move)
         ai_thinking = False
         return move
     
     except Exception as e:
-        logger.error(f"Error getting Stockfish move: {str(e)}")
+        logger.error("Error getting Stockfish move: %s", str(e))
         ai_thinking = False
         return None
-
-def make_ai_move():
-    """Make an AI move immediately without delay."""
-    global board, ai_thinking
-    
-    if not AI_ENABLED or board.is_game_over():
-        return None
-    
-    ai_thinking = True
-    logger.debug("AI thinking...")
-    
-    # Get the AI move
-    move = get_engine_move(board)
-    
-    if move:
-        # Make the move on the board
-        board.push(move)
-        logger.info(f"Stockfish made move: {move.uci()}")
-    
-    ai_thinking = False
-    return move
 
 # Initialize engine when the app starts
 @app.on_event("startup")
@@ -146,25 +125,25 @@ async def get_board():
     }
 
 @app.post("/move")
-async def make_move(move_request: MoveRequest, background_tasks: BackgroundTasks):
+async def make_move(move_request: MoveRequest):
     global board, ai_thinking
-    
+
     try:
         # Log the received request for debugging
-        logger.debug(f"Received move request: {move_request}")
+        logger.debug("Received move request: %s", move_request)
         
         # Get the move from the request
         from_square = move_request.from_square
         to_square = move_request.to_square
         
-        logger.debug(f"Attempting move from {from_square} to {to_square}")
+        logger.debug("Attempting move from %s to %s", from_square, to_square)
         
         # Create the move
         move = chess.Move.from_uci(f"{from_square}{to_square}")
         
         # Check if the move is legal
         if move not in board.legal_moves:
-            logger.warning(f"Illegal move attempted: {from_square}{to_square}")
+            logger.warning("Illegal move attempted: %s%s", from_square, to_square)
             return JSONResponse(
                 status_code=400,
                 content={"error": "Illegal move", "fen": board.fen()}
@@ -172,22 +151,21 @@ async def make_move(move_request: MoveRequest, background_tasks: BackgroundTasks
         
         # Make the move
         board.push(move)
-        logger.debug(f"Move completed: {from_square}{to_square}")
+        logger.debug("Move completed: %s%s", from_square, to_square)
         
         # Check if it's black's turn now and the game is not over
         if board.turn == chess.BLACK and not board.is_game_over() and AI_ENABLED:
             # Set ai_thinking flag to true to indicate AI is thinking
             ai_thinking = True
-            logger.debug("AI's turn - making move directly")
+            logger.debug("AI's turn")
             
-            # Make AI move directly instead of as a background task
             if not board.is_game_over():
                 move = get_engine_move(board)
                 
                 if move:
                     # Make the move on the board
                     board.push(move)
-                    logger.info(f"Stockfish made move: {move.uci()}")
+                    logger.info("Stockfish made move: %s", move.uci())
             
             # Reset ai_thinking flag
             ai_thinking = False
@@ -214,8 +192,8 @@ async def make_move(move_request: MoveRequest, background_tasks: BackgroundTasks
             "ai_thinking": False
         }
     except Exception as e:
-        logger.exception(f"Error in make_move: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.exception("Error in make_move: %s", str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 @app.post("/undo")
 async def undo_last_move():
@@ -294,8 +272,8 @@ async def set_ai_options(options: dict):
         }
     
     except Exception as e:
-        logger.exception(f"Error setting AI options: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.exception("Error setting AI options: %s", str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 # Run the app
 if __name__ == "__main__":

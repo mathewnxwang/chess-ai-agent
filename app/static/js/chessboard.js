@@ -31,62 +31,6 @@ $(document).ready(function() {
     // Initialize the board
     let board = Chessboard('board', config);
     
-    // These functions are no longer needed as AI moves are made immediately
-    // and returned in the response to the user's move
-    function startPolling() {
-        // No longer needed - AI moves immediately
-        console.log("Polling no longer needed - AI moves immediately");
-    }
-    
-    function stopPolling() {
-        // Clean up any existing interval just in case
-        if (boardUpdateInterval) {
-            clearInterval(boardUpdateInterval);
-            boardUpdateInterval = null;
-        }
-    }
-    
-    // This function is kept for backwards compatibility but is no longer needed
-    async function checkForAiMove() {
-        console.log("Manual check for AI move - should not be needed");
-        try {
-            const response = await fetch('/board');
-            const data = await response.json();
-            
-            // Update the game state with the server state
-            game.load(data.fen);
-            updateBoardAfterServerMove(data);
-        } catch (error) {
-            console.error('Error checking for AI move:', error);
-        }
-    }
-    
-    // Helper function to update the board after receiving a move from the server
-    function updateBoardAfterServerMove(data) {
-        // Get the last move from the move stack
-        if (game.history().length > moveHistory.length) {
-            // Get the last move made
-            const moveObj = game.history({ verbose: true }).pop();
-            
-            if (moveObj) {
-                // Update last move for highlighting
-                lastMove = { from: moveObj.from, to: moveObj.to };
-                
-                // Add the move to our history
-                addMoveToHistory(moveObj);
-                
-                // Update the board
-                board.position(game.fen());
-                
-                // Highlight the move
-                highlightLastMove();
-                
-                // Update game status
-                updateStatus();
-            }
-        }
-    }
-    
     // Only allow dragging player's own pieces
     function onDragStart(source, piece, position, orientation) {
         // Don't allow dragging if the game is over
@@ -99,11 +43,6 @@ $(document).ready(function() {
         
         // Only allow black to move when it's black's turn
         if (game.turn() === 'b' && piece.search(/^w/) !== -1) {
-            return false;
-        }
-        
-        // Only allow white pieces to be moved (user always plays as white)
-        if (piece.search(/^b/) !== -1) {
             return false;
         }
     }
@@ -131,8 +70,6 @@ $(document).ready(function() {
         
         // Send the move to the server - the AI's response will be handled in sendMoveToServer
         sendMoveToServer(source, target);
-        
-        // No need to poll - AI moves immediately and response is in sendMoveToServer
     }
     
     // Update the board position after the piece snap animation
@@ -429,9 +366,6 @@ $(document).ready(function() {
                 
                 // Remove any highlights
                 $('.highlight-last-move').removeClass('highlight-last-move');
-                
-                // Stop polling if active
-                stopPolling();
             }
         } catch (error) {
             console.error('Error resetting game on server:', error);
@@ -472,11 +406,6 @@ $(document).ready(function() {
             }
             
             updateStatus();
-            
-            // If it's black's turn, immediately fetch the latest board state
-            if (game.turn() === 'b' && !game.game_over()) {
-                checkForAiMove();  // This will just update the UI with the current state
-            }
         })
         .catch(error => {
             console.error('Error getting initial board state:', error);
