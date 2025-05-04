@@ -14,11 +14,12 @@ from app.llm_resource import (
 )
 
 class ChessAgent():
-    def __init__(self):
+    def __init__(self, model: str = "gpt-4o"):
         self.llm_manager = LLMManager()
         self.memory = ""
         self.considered_moves = ""
         self.iterations = 0
+        self.model = model
 
     def make_valid_move(self, board: chess.Board, position: str) -> tuple[chess.Move, str]:
         thinking = True
@@ -35,7 +36,7 @@ class ChessAgent():
 
     def decide_on_action(self, board: chess.Board, position: str) -> LLMChessMove | None:
         llm_response = self.llm_manager.call_llm(
-            model="gpt-4o",
+            model=self.model,
             system_prompt=ORCHESTRATION_SYSTEM_PROMPT,
             user_prompt=ORCHESTRATION_USER_PROMPT,
             response_format=Decision,
@@ -95,7 +96,7 @@ class ChessAgent():
             formatted_user_prompt = CONSIDER_NEW_MOVE_USER_PROMPT.format(position=position, memory=self.memory, considered_moves=self.considered_moves)
         
         response = self.llm_manager.call_llm(
-            model="gpt-4o",
+            model=self.model,
             system_prompt=SYSTEM_PROMPT,
             user_prompt=formatted_user_prompt,
             response_format=LLMChessMove,
@@ -122,7 +123,7 @@ class ChessAgent():
         formatted_user_prompt = DECIDE_ON_MOVE_USER_PROMPT.format(position=position, memory=self.memory, considered_moves=self.considered_moves)
 
         response = self.llm_manager.call_llm(
-            model="gpt-4o",
+            model=self.model,
             system_prompt=SYSTEM_PROMPT,
             user_prompt=formatted_user_prompt,
             response_format=LLMChessMove,
