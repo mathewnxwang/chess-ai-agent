@@ -1,7 +1,10 @@
 import os
-import json
 from dotenv import load_dotenv
-from enum import Enum
+import logging
+
+# Configure logging for OpenAI
+logging.getLogger("openai").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 from openai import OpenAI
 from openai.types.chat.chat_completion import ChatCompletion
@@ -11,7 +14,7 @@ Given the position in PGN format, return the best, valid next move in standard a
 Example of a correct response: 'e5'
 Examples of incorrect responses:
 - '2. e5'
-- 'e5 is the best move to play in this position.'""" 
+- 'e5 is the best move to play in this position.'"""
 
 USER_PROMPT = """Position: {position}
 

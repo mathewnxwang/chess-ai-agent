@@ -2,8 +2,14 @@ import chess
 import chess.pgn
 import io
 from typing import cast
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
 
 def convert_board_to_pgn(board: chess.Board) -> str:
+    logger.debug("Converting this board to PGN:\n%s", board)
     # Create a new game
     game = chess.pgn.Game()
     
@@ -17,5 +23,5 @@ def convert_board_to_pgn(board: chess.Board) -> str:
     exporter = chess.pgn.FileExporter(pgn_string)
     game.accept(exporter)
     
-    print("PGN string for the LLM: \n" + pgn_string.getvalue())
+    print("PGN string constructed for the LLM: \n" + pgn_string.getvalue())
     return pgn_string.getvalue()

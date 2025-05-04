@@ -1,0 +1,8 @@
+[MESSAGES CONTROL]
+disable=C0116  # missing-function-docstring
+
+[FORMAT]
+max-line-length=120
+
+[MASTER]
+ignore=CVS 

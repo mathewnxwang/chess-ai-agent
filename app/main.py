@@ -16,6 +16,10 @@ from app.resource import GameState, MoveRequest
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+# Silence httpcore logs
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)  # Also silence httpx if you're using it
+
 app = FastAPI()
 
 # Mount static files
@@ -89,9 +93,9 @@ def get_engine_move(board_state: chess.Board) -> chess.Move:
         return None
 
 # Initialize engine when the app starts
-@app.on_event("startup")
-async def startup_event():
-    initialize_engine()
+# @app.on_event("startup")
+# async def startup_event():
+#   initialize_engine()
 
 # Shutdown engine when the app stops
 @app.on_event("shutdown")
@@ -210,7 +214,7 @@ async def make_llm_agent_move() -> GameState:
                 content={"error": "Not AI's turn or game is over", "fen": board.fen()}
             )
         
-        logger.debug("AI's turn")
+        logger.debug("AI turn begins")
 
         pgn_string = convert_board_to_pgn(board)
 
@@ -219,7 +223,7 @@ async def make_llm_agent_move() -> GameState:
         if move:
             # Make the move on the board
             board.push(move)
-            logger.info("Stockfish made move: %s", move.uci())
+            logger.info("AI made move: %s", move.uci())
         else:
             logger.error("AI could not make a move")
             return JSONResponse(
