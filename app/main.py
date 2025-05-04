@@ -1,15 +1,16 @@
-import chess
-import chess.engine
 import logging
 from typing import Optional
-from fastapi import FastAPI, Request, HTTPException
+
+import chess
+import chess.engine
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.resource import MoveRequest, GameState
 from app.agent import ChessAgent
 from app.chess_helper import convert_board_to_pgn
+from app.resource import GameState, MoveRequest
 
 # Configure logging to see detailed errors
 logging.basicConfig(level=logging.DEBUG)
