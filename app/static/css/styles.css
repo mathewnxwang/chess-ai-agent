@@ -100,13 +100,13 @@ h1, h2, h3, h4, h5, h6 {
 /* Main Game Container */
 .game-container {
     display: grid;
-    grid-template-columns: 1fr 2fr 1fr;
+    grid-template-columns: 1fr 2fr;
     gap: 20px;
     margin-bottom: 30px;
 }
 
 /* Cards */
-.status-card, .controls-card, .move-history, .board-container, .ai-settings-card {
+.status-card, .board-container {
     background-color: var(--white);
     border-radius: var(--border-radius);
     box-shadow: var(--box-shadow);
@@ -114,7 +114,7 @@ h1, h2, h3, h4, h5, h6 {
     transition: var(--transition);
 }
 
-.status-card:hover, .controls-card:hover, .move-history:hover, .ai-settings-card:hover {
+.status-card:hover {
     transform: translateY(-5px);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
@@ -485,7 +485,7 @@ h1, h2, h3, h4, h5, h6 {
         grid-template-columns: 1fr 1fr;
         grid-template-areas:
             "board board"
-            "info history";
+            "info info";
     }
     
     .board-container {
@@ -495,10 +495,6 @@ h1, h2, h3, h4, h5, h6 {
     .game-info {
         grid-area: info;
     }
-    
-    .move-history {
-        grid-area: history;
-    }
 }
 
 @media (max-width: 768px) {
@@ -506,8 +502,7 @@ h1, h2, h3, h4, h5, h6 {
         grid-template-columns: 1fr;
         grid-template-areas:
             "board"
-            "info"
-            "history";
+            "info";
     }
     
     .app-header h1 {

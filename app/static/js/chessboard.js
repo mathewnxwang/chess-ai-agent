@@ -2,18 +2,10 @@ $(document).ready(function() {
     // DOM elements
     const $board = $('#board');
     const $gameStatus = $('#game-status');
-    const $resetBtn = $('#reset-btn');
-    const $undoBtn = $('#undo-btn');
-    const $moveList = $('#move-list');
-    const $skillLevel = $('#skill-level');
-    const $searchDepth = $('#search-depth');
-    const $applySettings = $('#apply-settings');
     
     // Game state
     let game = new Chess();
-    let moveHistory = [];
     let lastMove = null;
-    let boardUpdateInterval = null;
     
     // Board configuration
     const config = {
@@ -62,9 +54,6 @@ $(document).ready(function() {
         // Save last move for highlighting
         lastMove = { from: source, to: target };
         
-        // Add move to history
-        addMoveToHistory(move);
-        
         // Update game status
         updateStatus();
         
@@ -84,41 +73,6 @@ $(document).ready(function() {
     function onMoveEnd(oldPos, newPos) {
         $('.square-' + lastMove.to).addClass('highlight-last-move');
         $('.square-' + lastMove.from).addClass('highlight-last-move');
-    }
-    
-    // Add move to the history list
-    function addMoveToHistory(move) {
-        moveHistory.push(move);
-        
-        // Create move notation
-        const moveNumber = Math.floor((moveHistory.length - 1) / 2) + 1;
-        const isWhiteMove = (moveHistory.length % 2 === 1);
-        const moveColor = isWhiteMove ? 'White' : 'Black';
-        
-        // Add move to UI
-        const $moveItem = $('<div class="move-item"></div>');
-        
-        // Format the move notation
-        const moveText = `${move.san}${move.san.includes('+') ? '' : move.san.includes('#') ? '' : (game.in_check() ? '+' : '')}`;
-        
-        // If it's a white move, create a new row with the move number
-        if (isWhiteMove) {
-            $moveItem.html(`
-                <span class="move-number">${moveNumber}.</span>
-                <span class="move-text">${moveText}</span>
-            `);
-        } else {
-            // If it's a black move, append to the last row
-            $moveItem.html(`
-                <span class="move-number">${moveNumber}...</span>
-                <span class="move-text">${moveText}</span>
-            `);
-        }
-        
-        $moveList.append($moveItem);
-        
-        // Scroll to the bottom of the move list
-        $moveList.scrollTop($moveList[0].scrollHeight);
     }
     
     // Highlight the last move made
@@ -143,9 +97,6 @@ $(document).ready(function() {
             const winner = game.turn() === 'w' ? 'Black' : 'White';
             status = `Checkmate! ${winner} wins`;
             statusClass += ' checkmate';
-            
-            // Add victory animation
-            animateVictory(winner.toLowerCase());
         } 
         // Check if it's a draw
         else if (game.in_draw()) {
@@ -167,19 +118,6 @@ $(document).ready(function() {
         // Update status text and class
         $gameStatus.text(status);
         $gameStatus.attr('class', statusClass);
-    }
-    
-    // Add a victory animation
-    function animateVictory(winner) {
-        const $board = $('.board-container');
-        
-        // Add a winner class to trigger animation
-        $board.addClass('winner-' + winner);
-        
-        // Remove the class after animation
-        setTimeout(() => {
-            $board.removeClass('winner-' + winner);
-        }, 3000);
     }
     
     // Send move to server to update backend state and get AI's response
@@ -211,30 +149,18 @@ $(document).ready(function() {
                 // Update game with server response (which now includes AI's move if made)
                 game.load(data.fen);
                 
-                // Only update UI if AI made a move (if length of move history changed)
-                if (game.history().length > moveHistory.length + 1) {
-                    // This means both player move and AI move are in the new FEN
-                    // First, get the last two moves
-                    const history = game.history({ verbose: true });
-                    const aiMove = history[history.length - 1];
-                    
-                    if (aiMove) {
-                        console.log('AI responded with move:', aiMove.san);
-                        
-                        // Update last move for highlighting (to the AI's move)
-                        lastMove = { from: aiMove.from, to: aiMove.to };
-                        
-                        // Add both moves to history
-                        // The player's move was already added in onDrop
-                        addMoveToHistory(aiMove);
-                        
-                        // Update the board to show the AI's move
-                        board.position(data.fen);
-                        
-                        // Highlight the AI's move
-                        highlightLastMove();
-                    }
+                // Update the last move to the AI's move if it made one
+                const history = game.history({ verbose: true });
+                if (history.length > 0) {
+                    const lastMoveObj = history[history.length - 1];
+                    lastMove = { from: lastMoveObj.from, to: lastMoveObj.to };
                 }
+                
+                // Update the board to show the current position
+                board.position(game.fen());
+                
+                // Highlight the last move
+                highlightLastMove();
                 
                 // Update game status after AI move
                 updateStatus();
@@ -245,143 +171,10 @@ $(document).ready(function() {
         }
     }
     
-    // Apply AI settings to the server
-    async function applyAiSettings() {
-        try {
-            const skillLevel = parseInt($skillLevel.val());
-            const searchDepth = parseInt($searchDepth.val());
-            
-            const response = await fetch('/set_ai_options', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    skill_level: skillLevel,
-                    depth: searchDepth,
-                    enabled: true
-                })
-            });
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Server error response:', errorText);
-                throw new Error(`Server returned ${response.status}: ${errorText}`);
-            }
-            
-            const data = await response.json();
-            console.log('AI settings updated:', data);
-            
-            // Show success indicator
-            $applySettings.html('<i class="fas fa-check"></i> Settings Applied');
-            
-            // Reset button text after 2 seconds
-            setTimeout(() => {
-                $applySettings.html('<i class="fas fa-check"></i> Apply Settings');
-            }, 2000);
-            
-        } catch (error) {
-            console.error('Error applying AI settings:', error);
-            $gameStatus.text('Error updating AI settings');
-        }
-    }
-    
-    // Undo the last move
-    async function undoLastMove() {
-        try {
-            const response = await fetch('/undo', {
-                method: 'POST'
-            });
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Server error response:', errorText);
-                throw new Error(`Server returned ${response.status}: ${errorText}`);
-            }
-            
-            const data = await response.json();
-            
-            if (data.error) {
-                console.error(data.error);
-                $gameStatus.text(data.error);
-            } else {
-                // Reset the client-side game state
-                game.load(data.fen);
-                
-                // Reset move history (simplest approach is to clear and rebuild from the game history)
-                moveHistory = [];
-                $moveList.empty();
-                
-                // Rebuild move history from game
-                const verboseMoves = game.history({ verbose: true });
-                verboseMoves.forEach(move => {
-                    addMoveToHistory(move);
-                });
-                
-                // Update the board position
-                board.position(game.fen());
-                
-                // Update last move highlight
-                if (verboseMoves.length > 0) {
-                    const lastMoveObj = verboseMoves[verboseMoves.length - 1];
-                    lastMove = { from: lastMoveObj.from, to: lastMoveObj.to };
-                    highlightLastMove();
-                } else {
-                    lastMove = null;
-                    $('.highlight-last-move').removeClass('highlight-last-move');
-                }
-                
-                // Update the game status
-                updateStatus();
-            }
-        } catch (error) {
-            console.error('Error undoing move:', error);
-            $gameStatus.text('Error undoing move');
-        }
-    }
-    
-    // Reset the game
-    async function resetGame() {
-        try {
-            // Reset server-side game state
-            const response = await fetch('/reset', {
-                method: 'POST'
-            });
-            
-            const data = await response.json();
-            
-            if (data.error) {
-                console.error(data.error);
-                $gameStatus.text(data.error);
-            } else {
-                // Reset client-side game state
-                game = new Chess();
-                moveHistory = [];
-                lastMove = null;
-                
-                // Reset the UI
-                board.position('start');
-                $moveList.empty();
-                updateStatus();
-                
-                // Remove any highlights
-                $('.highlight-last-move').removeClass('highlight-last-move');
-            }
-        } catch (error) {
-            console.error('Error resetting game on server:', error);
-            $gameStatus.text('Error resetting game on server');
-        }
-    }
-    
     // Make the board responsive
     $(window).resize(function() {
         board.resize();
     });
-    
-    // Add event listeners for buttons
-    $resetBtn.on('click', resetGame);
-    $undoBtn.on('click', undoLastMove);
-    $applySettings.on('click', applyAiSettings);
     
     // Initialize game status
     updateStatus();
@@ -390,21 +183,8 @@ $(document).ready(function() {
     fetch('/board')
         .then(response => response.json())
         .then(data => {
-            game.load(data.fen);
-            board.position(data.fen);
-            
-            // Rebuild move history if needed
-            if (game.history().length > 0) {
-                const verboseMoves = game.history({ verbose: true });
-                verboseMoves.forEach(move => {
-                    addMoveToHistory(move);
-                });
-                
-                const lastMoveObj = verboseMoves[verboseMoves.length - 1];
-                lastMove = { from: lastMoveObj.from, to: lastMoveObj.to };
-                highlightLastMove();
-            }
-            
+            game.load(data.fen());
+            board.position(data.fen());
             updateStatus();
         })
         .catch(error => {
