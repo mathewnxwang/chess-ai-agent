@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, Field
+from app.resource import MoveRequest, GameState
 
 # Configure logging to see detailed errors
 logging.basicConfig(level=logging.DEBUG)
@@ -21,18 +21,10 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 # Templates
 templates = Jinja2Templates(directory="app/templates")
 
-# Define request model for move
-class MoveRequest(BaseModel):
-    from_square: str = Field(alias="from")
-    to_square: str = Field(alias="to")
-    
-    class Config:
-        validate_by_name = True
-
 # Game state
 board = chess.Board()
 engine: Optional[chess.engine.SimpleEngine] = None
-stockfish_path = "/Users/mathew.wang/Downloads/stockfish/stockfish-macos-m1-apple-silicon"
+STOCKFISH_PATH = "/Users/mathew.wang/Downloads/stockfish/stockfish-macos-m1-apple-silicon"
 AI_SKILL_LEVEL = 5   # Default skill level (1-20)
 AI_DEPTH = 10        # Default search depth
 
@@ -45,7 +37,7 @@ def initialize_engine():
     
     try:
         # Start the engine with the specified path
-        engine = chess.engine.SimpleEngine.popen_uci(stockfish_path)
+        engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
         
         # Set engine options for Stockfish
         try:
@@ -109,28 +101,28 @@ async def root(request: Request):
 async def get_board():
     # Return the current board state as a FEN string
     # Also include legal moves for the UI
-    return {
-        "fen": board.fen(),
-        "legal_moves": [move.uci() for move in board.legal_moves],
-        "is_check": board.is_check(),
-        "is_checkmate": board.is_checkmate(),
-        "is_game_over": board.is_game_over(),
-        "result": board.result() if board.is_game_over() else None
-    }
+    return GameState(
+        fen=board.fen(),
+        legal_moves=[move.uci() for move in board.legal_moves],
+        is_check=board.is_check(),
+        is_checkmate=board.is_checkmate(),
+        is_game_over=board.is_game_over(),
+        result=board.result() if board.is_game_over() else None
+    )
 
-@app.post("/move")
-async def make_move(move_request: MoveRequest):
+@app.post("/move/player")
+async def make_player_move(move_request: MoveRequest):
     global board
 
     try:
         # Log the received request for debugging
-        logger.debug("Received move request: %s", move_request)
+        logger.debug("Received player move request: %s", move_request)
         
         # Get the move from the request
         from_square = move_request.from_square
         to_square = move_request.to_square
         
-        logger.debug("Attempting move from %s to %s", from_square, to_square)
+        logger.debug("Attempting player move from %s to %s", from_square, to_square)
         
         # Create the move
         move = chess.Move.from_uci(f"{from_square}{to_square}")
@@ -143,43 +135,61 @@ async def make_move(move_request: MoveRequest):
                 content={"error": "Illegal move", "fen": board.fen()}
             )
         
-        # Make the move
+        # Make the player's move
         board.push(move)
-        logger.debug("Move completed: %s%s", from_square, to_square)
+        logger.debug("Player move completed: %s%s", from_square, to_square)
         
-        # Check if it's black's turn now and the game is not over
-        if board.turn == chess.BLACK and not board.is_game_over():
-            logger.debug("AI's turn")
-            
-            if not board.is_game_over():
-                move = get_engine_move(board)
-                
-                if move:
-                    # Make the move on the board
-                    board.push(move)
-                    logger.info("Stockfish made move: %s", move.uci())
-            
-            # Return the updated board state after AI move
-            return {
-                "fen": board.fen(),
-                "legal_moves": [move.uci() for move in board.legal_moves],
-                "is_check": board.is_check(),
-                "is_checkmate": board.is_checkmate(),
-                "is_game_over": board.is_game_over(),
-                "result": board.result() if board.is_game_over() else None
-            }
-        
-        # Otherwise, just return the current board state
-        return {
-            "fen": board.fen(),
-            "legal_moves": [move.uci() for move in board.legal_moves],
-            "is_check": board.is_check(),
-            "is_checkmate": board.is_checkmate(),
-            "is_game_over": board.is_game_over(),
-            "result": board.result() if board.is_game_over() else None
-        }
+        # Return the updated board state after player's move
+        return GameState(
+            fen=board.fen(),
+            legal_moves=[move.uci() for move in board.legal_moves],
+            is_check=board.is_check(),
+            is_checkmate=board.is_checkmate(),
+            is_game_over=board.is_game_over(),
+            result=board.result() if board.is_game_over() else None
+        )
     except Exception as e:
-        logger.exception("Error in make_move: %s", str(e))
+        logger.exception("Error in make_player_move: %s", str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+@app.post("/move/ai")
+async def make_ai_move():
+    global board
+
+    try:
+        # Check if it's not black's turn or game is over
+        if board.turn != chess.BLACK or board.is_game_over():
+            logger.warning("AI move requested when it's not AI's turn or game is over")
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Not AI's turn or game is over", "fen": board.fen()}
+            )
+        
+        logger.debug("AI's turn")
+        move = get_engine_move(board)
+        
+        if move:
+            # Make the move on the board
+            board.push(move)
+            logger.info("Stockfish made move: %s", move.uci())
+        else:
+            logger.error("AI could not make a move")
+            return JSONResponse(
+                status_code=500,
+                content={"error": "AI could not make a move", "fen": board.fen()}
+            )
+        
+        # Return the updated board state after AI move
+        return GameState(
+            fen=board.fen(),
+            legal_moves=[move.uci() for move in board.legal_moves],
+            is_check=board.is_check(),
+            is_checkmate=board.is_checkmate(),
+            is_game_over=board.is_game_over(),
+            result=board.result() if board.is_game_over() else None
+        )
+    except Exception as e:
+        logger.exception("Error in make_ai_move: %s", str(e))
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 # Run the app

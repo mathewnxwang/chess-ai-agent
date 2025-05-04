@@ -23,7 +23,6 @@ $(document).ready(function() {
     // Initialize the board
     let board = Chessboard('board', config);
     
-    // Only allow dragging player's own pieces
     function onDragStart(source, piece, position, orientation) {
         // Don't allow dragging if the game is over
         if (game.game_over()) return false;
@@ -32,11 +31,16 @@ $(document).ready(function() {
         if (game.turn() === 'w' && piece.search(/^b/) !== -1) {
             return false;
         }
-        
-        // Only allow black to move when it's black's turn
-        if (game.turn() === 'b' && piece.search(/^w/) !== -1) {
+
+        // Only allow white pieces to be dragged
+        if (piece.search(/^b/) !== -1) {
             return false;
         }
+
+        // // Only allow black to move when it's black's turn
+        // if (game.turn() === 'b' && piece.search(/^w/) !== -1) {
+        //     return false;
+        // }
     }
     
     // Handle piece drops
@@ -57,8 +61,7 @@ $(document).ready(function() {
         // Update game status
         updateStatus();
         
-        // Send the move to the server - the AI's response will be handled in sendMoveToServer
-        sendMoveToServer(source, target);
+        orchestrateMoves(source, target);
     }
     
     // Update the board position after the piece snap animation
@@ -120,10 +123,10 @@ $(document).ready(function() {
         $gameStatus.attr('class', statusClass);
     }
     
-    // Send move to server to update backend state and get AI's response
-    async function sendMoveToServer(from, to) {
+    // Send player move to server
+    async function sendPlayerMove(from, to) {
         try {
-            const response = await fetch('/move', {
+            const response = await fetch('/move/player', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -136,7 +139,52 @@ $(document).ready(function() {
             
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error('Server error response:', errorText);
+                console.error('Player move error:', errorText);
+                throw new Error(`Server returned ${response.status}: ${errorText}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                console.error(data.error);
+                $gameStatus.text(data.error);
+                return false;
+            } else {
+                // Update game with server response after player's move
+                game.load(data.fen);
+                
+                // Update the board to show the current position
+                board.position(game.fen());
+                
+                // Highlight the last move
+                highlightLastMove();
+                
+                // Update game status after player's move
+                updateStatus();
+                
+                // Return whether the game is over
+                return data.is_game_over;
+            }
+        } catch (error) {
+            console.error('Error sending player move to server:', error);
+            $gameStatus.text('Error communicating with server');
+            return true; // Return true to prevent AI move attempt
+        }
+    }
+    
+    // Request AI move from server
+    async function requestAiMove() {
+        try {
+            const response = await fetch('/move/ai', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('AI move error:', errorText);
                 throw new Error(`Server returned ${response.status}: ${errorText}`);
             }
             
@@ -146,10 +194,10 @@ $(document).ready(function() {
                 console.error(data.error);
                 $gameStatus.text(data.error);
             } else {
-                // Update game with server response (which now includes AI's move if made)
+                // Update game with server response after AI's move
                 game.load(data.fen);
                 
-                // Update the last move to the AI's move if it made one
+                // Update the last move to the AI's move
                 const history = game.history({ verbose: true });
                 if (history.length > 0) {
                     const lastMoveObj = history[history.length - 1];
@@ -166,8 +214,19 @@ $(document).ready(function() {
                 updateStatus();
             }
         } catch (error) {
-            console.error('Error sending move to server:', error);
-            $gameStatus.text('Error communicating with server');
+            console.error('Error requesting AI move from server:', error);
+            $gameStatus.text('Error getting AI response');
+        }
+    }
+    
+    // Handle the complete move process (player move followed by AI move)
+    async function orchestrateMoves(from, to) {
+        // First send the player's move
+        const gameOver = await sendPlayerMove(from, to);
+        
+        // If the game is not over, request the AI move
+        if (!gameOver && game.turn() === 'b') {
+            await requestAiMove();
         }
     }
     
