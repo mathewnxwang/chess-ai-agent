@@ -218,27 +218,34 @@ async def make_llm_agent_move() -> GameState:
 
         pgn_string = convert_board_to_pgn(board)
 
-        move = chess_agent.make_valid_move(board=board, position=pgn_string)
-
-        if move:
-            # Make the move on the board
-            board.push(move)
-            logger.info("AI made move: %s", move.uci())
-        else:
+        # Get move and reasoning from the agent
+        move_result = chess_agent.make_valid_move(board=board, position=pgn_string)
+        
+        if not move_result:
             logger.error("AI could not make a move")
             return JSONResponse(
                 status_code=500,
                 content={"error": "AI could not make a move", "fen": board.fen()}
             )
+            
+        move, reasoning = move_result
         
-        # Return the updated board state after AI move
+        # Log both the move and reasoning
+        logger.info("AI made move: %s", move.uci())
+        logger.info("AI reasoning: %s", reasoning)
+        
+        # Make the move on the board
+        board.push(move)
+        
+        # Return the updated board state after AI move with reasoning
         return GameState(
             fen=board.fen(),
             legal_moves=[move.uci() for move in board.legal_moves],
             is_check=board.is_check(),
             is_checkmate=board.is_checkmate(),
             is_game_over=board.is_game_over(),
-            result=board.result() if board.is_game_over() else None
+            result=board.result() if board.is_game_over() else None,
+            ai_reasoning=reasoning
         )
     except Exception as e:
         logger.exception("Error in make_ai_move: %s", str(e))

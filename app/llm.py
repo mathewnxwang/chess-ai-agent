@@ -53,7 +53,6 @@ class LLMManager():
             model: str,
             system_prompt: str,
             user_prompt: str,
-            temperature: float = 0,
         ) -> LLMChessMove:
         print(
             f"Calling LLM with system prompt: {system_prompt}\n\n"
@@ -80,8 +79,10 @@ class LLMManager():
         print(f"Pydantic object extracted from OpenAI response: {data}")
         return data
 
-    def make_llm_move(self, position: str, error_message: str | None) -> str:
-
+    def make_llm_move(self, position: str, error_message: str | None) -> LLMChessMove:
+        """
+        Get a move from the LLM. Returns the full LLMChessMove object with move and reasoning.
+        """
         if error_message:
             formatted_user_prompt = USER_PROMPT_WITH_ERROR.format(position=position, error_message=error_message)
         else:
@@ -93,4 +94,4 @@ class LLMManager():
             user_prompt=formatted_user_prompt,
         )
 
-        return response.move
+        return response

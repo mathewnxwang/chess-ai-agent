@@ -14,3 +14,4 @@ class GameState(BaseModel):
     is_checkmate: bool
     is_game_over: bool
     result: str | None = None
+    ai_reasoning: str | None = None

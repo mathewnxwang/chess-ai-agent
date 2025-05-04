@@ -106,7 +106,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Cards */
-.status-card, .board-container {
+.status-card, .ai-thoughts-card, .board-container {
     background-color: var(--white);
     border-radius: var(--border-radius);
     box-shadow: var(--box-shadow);
@@ -114,9 +114,40 @@ h1, h2, h3, h4, h5, h6 {
     transition: var(--transition);
 }
 
-.status-card:hover {
+.status-card:hover, .ai-thoughts-card:hover {
     transform: translateY(-5px);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* AI Reasoning Styles */
+.ai-thoughts-card .card-header {
+    background-color: var(--accent-color);
+}
+
+.ai-reasoning {
+    padding: 5px;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.thought-bubble {
+    position: relative;
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-left: 3px solid var(--accent-color);
+    font-style: italic;
+    color: var(--text-dark);
+}
+
+.thought-bubble:before {
+    content: "\201C"; /* Opening quotation mark */
+    font-size: 1.5em;
+    color: var(--accent-color);
+    position: absolute;
+    left: 5px;
+    top: 0;
 }
 
 .board-container:hover {

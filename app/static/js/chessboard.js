@@ -2,6 +2,7 @@ $(document).ready(function() {
     // DOM elements
     const $board = $('#board');
     const $gameStatus = $('#game-status');
+    const $aiReasoning = $('#ai-reasoning');
     
     // Game state
     let game = new Chess();
@@ -212,6 +213,11 @@ $(document).ready(function() {
                 
                 // Update game status after AI move
                 updateStatus();
+                
+                // Display AI reasoning if available
+                if (data.ai_reasoning) {
+                    displayAIReasoning(data.ai_reasoning);
+                }
             }
         } catch (error) {
             console.error('Error requesting AI move from server:', error);
@@ -228,6 +234,20 @@ $(document).ready(function() {
         if (!gameOver && game.turn() === 'b') {
             await requestAiMove();
         }
+    }
+    
+    // Function to display AI reasoning
+    function displayAIReasoning(reasoning) {
+        console.log("Displaying AI reasoning:", reasoning);
+        
+        // Create a thought bubble with the reasoning
+        const reasoningHTML = `<p class="thought-bubble">${reasoning}</p>`;
+        
+        // Update the AI reasoning container
+        $aiReasoning.html(reasoningHTML);
+        
+        // Add animation to make it appear smoothly
+        $aiReasoning.hide().fadeIn(500);
     }
     
     // Make the board responsive
