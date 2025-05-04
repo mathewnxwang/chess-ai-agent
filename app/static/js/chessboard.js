@@ -175,7 +175,7 @@ $(document).ready(function() {
     // Request AI move from server
     async function requestAiMove() {
         try {
-            const response = await fetch('/move/ai', {
+            const response = await fetch('/move/llm-agent', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

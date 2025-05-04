@@ -1,13 +1,15 @@
 import chess
 import chess.engine
-import os
 import logging
 from typing import Optional
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+
 from app.resource import MoveRequest, GameState
+from app.agent import ChessAgent
+from app.chess_helper import convert_board_to_pgn
 
 # Configure logging to see detailed errors
 logging.basicConfig(level=logging.DEBUG)
@@ -27,6 +29,8 @@ engine: Optional[chess.engine.SimpleEngine] = None
 STOCKFISH_PATH = "/Users/mathew.wang/Downloads/stockfish/stockfish-macos-m1-apple-silicon"
 AI_SKILL_LEVEL = 5   # Default skill level (1-20)
 AI_DEPTH = 10        # Default search depth
+
+chess_agent = ChessAgent()
 
 def initialize_engine():
     """Initialize the chess engine."""
@@ -59,7 +63,7 @@ def shutdown_engine():
         engine = None
         logger.info("Stockfish engine shut down")
 
-def get_engine_move(board_state: chess.Board):
+def get_engine_move(board_state: chess.Board) -> chess.Move:
     """Get a move from the chess engine."""
     global engine
     
@@ -98,7 +102,7 @@ async def root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.get("/board")
-async def get_board():
+async def get_board() -> GameState:
     # Return the current board state as a FEN string
     # Also include legal moves for the UI
     return GameState(
@@ -111,7 +115,7 @@ async def get_board():
     )
 
 @app.post("/move/player")
-async def make_player_move(move_request: MoveRequest):
+async def make_player_move(move_request: MoveRequest) -> GameState:
     global board
 
     try:
@@ -152,8 +156,8 @@ async def make_player_move(move_request: MoveRequest):
         logger.exception("Error in make_player_move: %s", str(e))
         raise HTTPException(status_code=400, detail=str(e)) from e
 
-@app.post("/move/ai")
-async def make_ai_move():
+@app.post("/move/stockfish")
+async def make_stockfish_move() -> GameState:
     global board
 
     try:
@@ -168,6 +172,49 @@ async def make_ai_move():
         logger.debug("AI's turn")
         move = get_engine_move(board)
         
+        if move:
+            # Make the move on the board
+            board.push(move)
+            logger.info("Stockfish made move: %s", move.uci())
+        else:
+            logger.error("AI could not make a move")
+            return JSONResponse(
+                status_code=500,
+                content={"error": "AI could not make a move", "fen": board.fen()}
+            )
+        
+        # Return the updated board state after AI move
+        return GameState(
+            fen=board.fen(),
+            legal_moves=[move.uci() for move in board.legal_moves],
+            is_check=board.is_check(),
+            is_checkmate=board.is_checkmate(),
+            is_game_over=board.is_game_over(),
+            result=board.result() if board.is_game_over() else None
+        )
+    except Exception as e:
+        logger.exception("Error in make_ai_move: %s", str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+@app.post("/move/llm-agent")
+async def make_llm_agent_move() -> GameState:
+    global board
+
+    try:
+        # Check if it's not black's turn or game is over
+        if board.turn != chess.BLACK or board.is_game_over():
+            logger.warning("AI move requested when it's not AI's turn or game is over")
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Not AI's turn or game is over", "fen": board.fen()}
+            )
+        
+        logger.debug("AI's turn")
+
+        pgn_string = convert_board_to_pgn(board)
+
+        move = chess_agent.make_valid_move(board=board, position=pgn_string)
+
         if move:
             # Make the move on the board
             board.push(move)
