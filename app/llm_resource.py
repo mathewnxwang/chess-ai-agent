@@ -8,6 +8,6 @@ class LLMChessMove(BaseModel):
     ))
     reasoning: str = Field(description=(
         "A thorough analysis of the position and of the best move to make. "
-        "Speak like you are talking out loud to yourself in a casual manner. "
-        "Be concise - don't use more than three sentences."
+        "Be concise - don't use more than three sentences. "
+        "Try to build on the previous reasoning you explained to create a coherent thought process."
     ))

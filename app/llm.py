@@ -25,6 +25,9 @@ Examples of incorrect responses:
 
 USER_PROMPT = """Position: {position}
 
+Here is each move you made previously and its reasoning:
+{memory}
+
 Black to play.
 
 For the love of god please don't add prefixes like '2.' or '2... ' to your move.
@@ -33,6 +36,9 @@ Move: """
 
 USER_PROMPT_WITH_ERROR = """
 Position: {position}
+
+Here is each move you made previously and its reasoning:
+{memory}
 
 Black to play.
 
@@ -47,12 +53,14 @@ class LLMManager():
         load_dotenv("secrets.env")
         openai_api_key = os.getenv("OPENAI_API_KEY")
         self.client = OpenAI(api_key=openai_api_key)
+        self.memory = ""
 
     def call_llm(
             self,
             model: str,
             system_prompt: str,
             user_prompt: str,
+            temperature: float = 1,
         ) -> LLMChessMove:
         print(
             f"Calling LLM with system prompt: {system_prompt}\n\n"
@@ -66,6 +74,7 @@ class LLMManager():
                 {"role": "user", "content": user_prompt},
             ],
             text_format=LLMChessMove,
+            temperature=temperature,
         )
         print("OpenAI call successful")
 
@@ -84,14 +93,23 @@ class LLMManager():
         Get a move from the LLM. Returns the full LLMChessMove object with move and reasoning.
         """
         if error_message:
-            formatted_user_prompt = USER_PROMPT_WITH_ERROR.format(position=position, error_message=error_message)
+            formatted_user_prompt = USER_PROMPT_WITH_ERROR.format(position=position, memory=self.memory, error_message=error_message)
         else:
-            formatted_user_prompt = USER_PROMPT.format(position=position)
+            formatted_user_prompt = USER_PROMPT.format(position=position, memory=self.memory)
         
         response = self.call_llm(
             model="gpt-4o",
             system_prompt=SYSTEM_PROMPT,
             user_prompt=formatted_user_prompt,
         )
+
+        if self.memory == "":
+            memory_addition = f"{response.move}: {response.reasoning}"
+        else:
+            memory_addition = f"\n{response.move}: {response.reasoning}"
+
+        print(f"New memory formed: {memory_addition}")
+        self.memory += memory_addition
+        print("Added new memory to existing memory.")
 
         return response
