@@ -8,5 +8,6 @@ class LLMChessMove(BaseModel):
     ))
     reasoning: str = Field(description=(
         "A thorough analysis of the position and of the best move to make. "
-        "Speak like you are talking out loud to yourself in a casual manner."
+        "Speak like you are talking out loud to yourself in a casual manner. "
+        "Make sure to insult your opponent's move."
     ))
