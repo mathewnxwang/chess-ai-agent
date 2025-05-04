@@ -1,13 +1,20 @@
 import os
 from dotenv import load_dotenv
 import logging
+from pydantic import BaseModel
+from typing import TypeVar
+
+from openai import OpenAI
+from openai.types.responses.parsed_response import (
+    ParsedResponse,
+    ParsedResponseOutputMessage,
+)
+
+from app.llm_resource import LLMChessMove
 
 # Configure logging for OpenAI
 logging.getLogger("openai").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
-
-from openai import OpenAI
-from openai.types.chat.chat_completion import ChatCompletion
 
 SYSTEM_PROMPT = """You are a grandmaster chess player.
 Given the position in PGN format, return the best, valid next move in standard algebraic notation.
@@ -46,21 +53,32 @@ class LLMManager():
             model: str,
             system_prompt: str,
             user_prompt: str,
-            temperature: float = 0
-        ) -> str:
-        print(f"Calling LLM with system prompt: {system_prompt}\n\nUser prompt: {user_prompt}")
-        response: ChatCompletion = self.client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            model=model,
-            temperature=temperature,
-            # max_tokens=300
+            temperature: float = 0,
+        ) -> LLMChessMove:
+        print(
+            f"Calling LLM with system prompt: {system_prompt}\n\n"
+            f"User prompt: {user_prompt}\n\n"
+            f"Response format: {LLMChessMove}"
         )
-        message = response.choices[0].message.content
-        print(f"LLM response: {message}")
-        return message
+        response = self.client.responses.parse(
+            model=model,
+            input=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            text_format=LLMChessMove,
+        )
+        print("OpenAI call successful")
+
+        print("Extracting Pydantic object from OpenAI response...")
+        output_message = next(
+            item
+            for item in response.output
+            if isinstance(item, ParsedResponseOutputMessage)
+        )
+        data = output_message.content[0].parsed
+        print(f"Pydantic object extracted from OpenAI response: {data}")
+        return data
 
     def make_llm_move(self, position: str, error_message: str | None) -> str:
 
@@ -72,7 +90,7 @@ class LLMManager():
         response = self.call_llm(
             model="gpt-4o",
             system_prompt=SYSTEM_PROMPT,
-            user_prompt=formatted_user_prompt
+            user_prompt=formatted_user_prompt,
         )
 
-        return response
+        return response.move
