@@ -9,14 +9,10 @@ ORCHESTRATION_USER_PROMPT = """You are deciding which move to play.
 {position}
 </current_position>
 
-<previous_moves_and_reasoning>
-{memory}
-</previous_moves_and_reasoning>
-
 These are your existing thoughts on the position and which move to play:
-<running_thoughts>
-{running_thoughts}
-</running_thoughts>
+<considered_moves>
+{considered_moves}
+</considered_moves>
 
 Decide whether you want to want to consider a new move or if you're ready to decide on a move.
 
@@ -38,10 +34,7 @@ Examples of incorrect responses:
 
 Position: {position}
 
-Here is each move you made previously and its reasoning:
-{memory}
-
-Here are other moves you already considered. DO NOT CHOOSE FROM THESE MOVES:
+Here are other moves you already considered and their reasoning. DO NOT CHOOSE FROM THESE MOVES:
 {considered_moves}
 
 Black to play.
@@ -58,10 +51,8 @@ Examples of incorrect responses:
 
 Position: {position}
 
-Here is each move you made previously and its reasoning:
-{memory}
-
-Here are all of the moves to consider. ONLY CHOOSE FROM THESE MOVES.
+Here are all of the moves to consider. ONLY CHOOSE FROM THESE MOVES:
+{considered_moves}
 
 Black to play.
 

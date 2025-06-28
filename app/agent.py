@@ -17,6 +17,7 @@ class ChessAgent():
     def __init__(self, model: str = "gpt-4o"):
         self.llm_manager = LLMManager()
         self.memory = ""
+        self.move_memory = ""
         self.considered_moves = ""
         self.model = model
         self.max_moves_to_consider = 3
@@ -25,7 +26,7 @@ class ChessAgent():
         iterations = 0
         
         while True:
-            decision = self.decide_on_action(board=board, position=position, iterations=iterations)
+            decision = self.decide_on_action(position=position, iterations=iterations)
             iterations += 1
             if decision is not None:
                 move: chess.Move = board.parse_san(decision.move)
@@ -37,11 +38,16 @@ class ChessAgent():
 
         raise Exception(f"Unable to make a move.")
 
-    def decide_on_action(self, board: chess.Board, position: str, iterations: int) -> LLMChessMove | None:
+    def decide_on_action(self, position: str, iterations: int) -> LLMChessMove | None:
+        formatted_user_prompt = ORCHESTRATION_USER_PROMPT.format(
+            position=position,
+            considered_moves=self.move_memory
+        )
+
         llm_response = self.llm_manager.call_llm(
             model=self.model,
             system_prompt=ORCHESTRATION_SYSTEM_PROMPT,
-            user_prompt=ORCHESTRATION_USER_PROMPT,
+            user_prompt=formatted_user_prompt,
             response_format=Decision,
         )
 
@@ -57,7 +63,10 @@ class ChessAgent():
         raise Exception(f"Invalid decision from LLM: {llm_response.decision}")
 
     def consider_new_move(self, position: str) -> LLMChessMove:
-        formatted_user_prompt = CONSIDER_NEW_MOVE_USER_PROMPT.format(position=position, memory=self.memory, considered_moves=self.considered_moves)
+        formatted_user_prompt = CONSIDER_NEW_MOVE_USER_PROMPT.format(
+            position=position,
+            considered_moves=self.move_memory
+        )
       
         response = self.llm_manager.call_llm(
             model=self.model,
@@ -66,12 +75,12 @@ class ChessAgent():
             response_format=LLMChessMove,
         )
 
-        self.update_context(response=response)
+        self.update_move_context(response=response)
 
         return response
 
     def decide_on_move(self, position: str) -> LLMChessMove:
-        formatted_user_prompt = DECIDE_ON_MOVE_USER_PROMPT.format(position=position, memory=self.memory, considered_moves=self.considered_moves)
+        formatted_user_prompt = DECIDE_ON_MOVE_USER_PROMPT.format(position=position, considered_moves=self.considered_moves)
 
         response = self.llm_manager.call_llm(
             model=self.model,
@@ -81,18 +90,12 @@ class ChessAgent():
         )
         return response
 
-    def update_context(self, response: LLMChessMove) -> None:
-        if self.memory == "":
+    def update_move_context(self, response: LLMChessMove) -> None:
+        if self.move_memory == "":
             memory_addition = f"{response.move}: {response.reasoning}"
         else:
             memory_addition = f"\n{response.move}: {response.reasoning}"
 
-        print(f"New memory formed: {memory_addition}")
+        print(f"New move memory formed: {memory_addition}")
         self.memory += memory_addition
-        print("Added new memory to existing memory.")
-
-        if self.considered_moves == "":
-            self.considered_moves = response.move
-        else:
-            self.considered_moves += f", {response.move}"
-        print(f"Updated considered moves, which now looks like: {self.considered_moves}")
+        print("Added new considered move to the existing move memory.")
