@@ -3,12 +3,14 @@ from app.llm import LLMManager
 from app.llm_resource import (
     Decision,
     DecisionOptions,
+    LLMChessMove,
+)
+from app.prompts import (
     ORCHESTRATION_SYSTEM_PROMPT,
     ORCHESTRATION_USER_PROMPT,
     USER_PROMPT_WITH_ERROR,
     USER_PROMPT,
     SYSTEM_PROMPT,
-    LLMChessMove,
     CONSIDER_NEW_MOVE_USER_PROMPT,
     DECIDE_ON_MOVE_USER_PROMPT,
 )
