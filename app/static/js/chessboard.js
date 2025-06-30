@@ -24,24 +24,14 @@ $(document).ready(function() {
     // Initialize the board
     let board = Chessboard('board', config);
     
-    function onDragStart(source, piece, position, orientation) {
+    function onDragStart(piece) {
         // Don't allow dragging if the game is over
         if (game.game_over()) return false;
         
-        // Only allow white to move when it's white's turn
-        if (game.turn() === 'w' && piece.search(/^b/) !== -1) {
-            return false;
-        }
-
-        // Only allow white pieces to be dragged
+        // Only allow white pieces to be dragged (AI plays black)
         if (piece.search(/^b/) !== -1) {
             return false;
         }
-
-        // // Only allow black to move when it's black's turn
-        // if (game.turn() === 'b' && piece.search(/^w/) !== -1) {
-        //     return false;
-        // }
     }
     
     // Handle piece drops

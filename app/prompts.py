@@ -23,7 +23,7 @@ Examples of incorrect responses:
 
 Position: {position}
 
-Here are other moves you already considered and their reasoning. DO NOT CHOOSE FROM THESE MOVES:
+Here are other moves you already considered. DO NOT CHOOSE FROM THESE MOVES:
 {considered_moves}
 
 Black to play.
