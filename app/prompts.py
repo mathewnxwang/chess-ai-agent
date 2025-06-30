@@ -6,7 +6,12 @@ ORCHESTRATION_USER_PROMPT = """You are deciding which move to play.
 {position}
 </current_position>
 
-These are your existing thoughts on the position and which move to play:
+These are the moves you have already played and why you played them:
+<previous_moves>
+{previous_moves}
+</previous_moves>
+
+These are your thoughts on the existing position and which move to play:
 <considered_moves>
 {considered_moves}
 </considered_moves>
@@ -22,6 +27,11 @@ Examples of incorrect responses:
 - 'e5 is the best move to play in this position.'
 
 Position: {position}
+
+These are the moves you have already played and why you played them:
+<previous_moves>
+{previous_moves}
+</previous_moves>
 
 Here are other moves you already considered. DO NOT CHOOSE FROM THESE MOVES:
 {considered_moves}
@@ -40,8 +50,15 @@ Examples of incorrect responses:
 
 Position: {position}
 
+These are the moves you have already played and why you played them:
+<previous_moves>
+{previous_moves}
+</previous_moves>
+
 Here are all of the moves to consider. ONLY CHOOSE FROM THESE MOVES:
+<considered_moves>
 {considered_moves}
+</considered_moves>
 
 Black to play.
 

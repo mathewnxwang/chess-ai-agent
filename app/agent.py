@@ -22,9 +22,8 @@ langfuse = get_client()
 class ChessAgent():
     def __init__(self, model: str = "gpt-4o"):
         self.llm_manager = LLMManager()
-        self.memory = ""
-        self.move_memory = ""
-        self.considered_moves = ""
+        self.game_memory = ""
+        self.analysis_memory = ""
         self.model = model
         self.max_moves_to_consider = 3
 
@@ -41,11 +40,17 @@ class ChessAgent():
 
                 langfuse.update_current_span(
                     metadata={
-                        "full_memory": self.memory,
-                        "move_memory": self.move_memory,
-                        "considered_moves": self.considered_moves,
+                        "game_memory": self.game_memory,
+                        "analysis_memory": self.analysis_memory,
                     }
                 )
+                # clear the analysis memory after a move is made
+                self.analysis_memory = ""
+                # update the game memory with the actual move made
+                if self.game_memory == "":
+                    self.game_memory += f"{move}: {decision.reasoning}"
+                else:
+                    self.game_memory += f"\n\n{move}: {decision.reasoning}"
                 return move, decision.reasoning
             
             # safety check to prevent infinite loop
@@ -63,9 +68,8 @@ class ChessAgent():
             langfuse.update_current_span(
                 metadata={
                     "decision": f"Agent decided to choose a move based on their analysis.",
-                    "full_memory": self.memory,
-                    "move_memory": self.move_memory,
-                    "considered_moves": self.considered_moves,
+                    "game_memory": self.game_memory,
+                    "analysis_memory": self.analysis_memory,
                 }
             )
             response = self.decide_on_move(position=position)
@@ -75,9 +79,8 @@ class ChessAgent():
             langfuse.update_current_span(
                 metadata={
                     "decision": f"Agent decided to choose a move because they have already considered {self.max_moves_to_consider} moves.",
-                    "full_memory": self.memory,
-                    "move_memory": self.move_memory,
-                    "considered_moves": self.considered_moves,
+                    "game_memory": self.game_memory,
+                    "analysis_memory": self.analysis_memory,
                 }
             )
             response = self.decide_on_move(position=position)
@@ -87,9 +90,8 @@ class ChessAgent():
             langfuse.update_current_span(
                 metadata={
                     "decision": f"Agent decided to consider a new move.",
-                    "full_memory": self.memory,
-                    "move_memory": self.move_memory,
-                    "considered_moves": self.considered_moves,
+                    "game_memory": self.game_memory,
+                    "analysis_memory": self.analysis_memory,
                 }
             )
             self.consider_new_move(position=position)
@@ -101,7 +103,8 @@ class ChessAgent():
     def decide_on_action(self, position: str) -> Decision:
         formatted_user_prompt = ORCHESTRATION_USER_PROMPT.format(
             position=position,
-            considered_moves=self.considered_moves
+            previous_moves=self.game_memory,
+            considered_moves=self.analysis_memory
         )
 
         llm_response = self.llm_manager.call_llm(
@@ -119,7 +122,8 @@ class ChessAgent():
     def consider_new_move(self, position: str) -> LLMChessMove:
         formatted_user_prompt = CONSIDER_NEW_MOVE_USER_PROMPT.format(
             position=position,
-            considered_moves=self.considered_moves
+            previous_moves=self.game_memory,
+            considered_moves=self.analysis_memory
         )
       
         response = self.llm_manager.call_llm(
@@ -137,7 +141,11 @@ class ChessAgent():
 
     @observe()
     def decide_on_move(self, position: str) -> LLMChessMove:
-        formatted_user_prompt = DECIDE_ON_MOVE_USER_PROMPT.format(position=position, considered_moves=self.considered_moves)
+        formatted_user_prompt = DECIDE_ON_MOVE_USER_PROMPT.format(
+            position=position,
+            previous_moves=self.game_memory,
+            considered_moves=self.analysis_memory
+        )
 
         response = self.llm_manager.call_llm(
             model=self.model,
@@ -152,18 +160,11 @@ class ChessAgent():
 
     @observe()
     def update_move_context(self, response: LLMChessMove) -> None:
-        if self.move_memory == "":
+        if self.analysis_memory == "":
             memory_addition = f"{response.move}: {response.reasoning}"
         else:
             memory_addition = f"\n\n{response.move}: {response.reasoning}"
 
-        if self.considered_moves == "":
-            considered_move = response.move
-        else:
-            considered_move = f"\n{response.move}"
-
-        self.memory += memory_addition
-        self.considered_moves += considered_move
-
-        langfuse.update_current_span(metadata={"new_move_memory": memory_addition, "full_move_memory": self.memory, "considered_moves": self.considered_moves})
+        self.analysis_memory += memory_addition
+        langfuse.update_current_span(metadata={"analysis_memory_added": memory_addition, "new_analysis_memory": self.analysis_memory})
 
