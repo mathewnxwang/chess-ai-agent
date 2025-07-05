@@ -31,6 +31,11 @@ Move: """
 
 DECIDE_ON_MOVE_USER_PROMPT = """{base_move_prompt}
 
+Here is your reasoning for why you were ready to decide on a move:
+<decision_reasoning>
+{decision_reasoning}
+</decision_reasoning>
+
 Here are all of the moves to consider. ONLY CHOOSE FROM THESE MOVES:
 <considered_moves>
 {considered_moves}

@@ -1,6 +1,5 @@
 import chess
 import chess.pgn
-import io
 from typing import cast
 import logging
 
@@ -18,10 +17,17 @@ def convert_board_to_pgn(board: chess.Board) -> str:
     for move in board.move_stack:
         node = cast(chess.pgn.Game, node.add_variation(move))
     
-    # Write the game to a string
-    pgn_string = io.StringIO()
-    exporter = chess.pgn.FileExporter(pgn_string)
-    game.accept(exporter)
+    full_pgn = str(game)
+    lines = full_pgn.split('\n')
     
-    print("PGN string constructed for the LLM: \n" + pgn_string.getvalue())
-    return pgn_string.getvalue()
+    # remove metadata headers
+    moves_start = 0
+    for i, line in enumerate(lines):
+        if not line.startswith('[') and line.strip():
+            moves_start = i
+            break
+    
+    moves_only = '\n'.join(lines[moves_start:]).strip()
+    
+    logger.debug("PGN string constructed for the LLM: \n" + moves_only)
+    return moves_only

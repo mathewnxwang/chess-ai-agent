@@ -67,6 +67,7 @@ class ChessAgent():
         decision = self.decide_on_action(position=position)
 
         if decision.decision == DecisionOptions.DECIDE_ON_MOVE:
+            decision_reasoning = decision.reasoning
             langfuse.update_current_span(
                 metadata={
                     "decision": "Agent decided to choose a move based on their analysis.",
@@ -74,7 +75,7 @@ class ChessAgent():
                     "analysis_memory": self.analysis_memory,
                 }
             )
-            response = self.decide_on_move(position=position)
+            response = self.decide_on_move(position=position, decision_reasoning=decision_reasoning)
             return response
     
         if iterations > self.max_moves_to_consider:
@@ -103,10 +104,21 @@ class ChessAgent():
 
     @observe()
     def decide_on_action(self, position: str) -> Decision:
+
+        if self.game_memory == "":
+            previous_moves = "No moves have been made yet."
+        else:
+            previous_moves = self.game_memory
+        
+        if self.analysis_memory == "":
+            considered_moves = "No moves have been considered yet."
+        else:
+            considered_moves = self.analysis_memory
+
         formatted_user_prompt = ORCHESTRATION_USER_PROMPT.format(
             position=position,
-            previous_moves=self.game_memory,
-            considered_moves=self.analysis_memory
+            previous_moves=previous_moves,
+            considered_moves=considered_moves,
         )
 
         llm_response = self.llm_manager.call_llm(
@@ -122,13 +134,24 @@ class ChessAgent():
 
     @observe()
     def consider_new_move(self, position: str) -> LLMChessMove:
+
+        if self.game_memory == "":
+            previous_moves = "No moves have been made yet."
+        else:
+            previous_moves = self.game_memory
+        
+        if self.analysis_memory == "":
+            considered_moves = "No moves have been considered yet."
+        else:
+            considered_moves = self.analysis_memory
+
         base_move_prompt = BASE_MOVE_PROMPT.format(
             position=position,
-            previous_moves=self.game_memory,
+            previous_moves=previous_moves,
         )
         formatted_user_prompt = CONSIDER_NEW_MOVE_USER_PROMPT.format(
             base_move_prompt=base_move_prompt,
-            considered_moves=self.analysis_memory,
+            considered_moves=considered_moves,
         )
       
         response = self.llm_manager.call_llm(
@@ -145,14 +168,26 @@ class ChessAgent():
         return response
 
     @observe()
-    def decide_on_move(self, position: str) -> LLMChessMove:
+    def decide_on_move(self, position: str, decision_reasoning: str | None = None) -> LLMChessMove:
+
+        if self.game_memory == "":
+            previous_moves = "No moves have been made yet."
+        else:
+            previous_moves = self.game_memory
+        
+        if self.analysis_memory == "":
+            considered_moves = "No moves have been considered yet."
+        else:
+            considered_moves = self.analysis_memory
+
         base_move_prompt = BASE_MOVE_PROMPT.format(
             position=position,
-            previous_moves=self.game_memory,
+            previous_moves=previous_moves,
         )
         formatted_user_prompt = DECIDE_ON_MOVE_USER_PROMPT.format(
             base_move_prompt=base_move_prompt,
-            considered_moves=self.analysis_memory,
+            considered_moves=considered_moves,
+            decision_reasoning=decision_reasoning,
         )
 
         response = self.llm_manager.call_llm(
@@ -166,7 +201,6 @@ class ChessAgent():
 
         return response
 
-    @observe()
     def update_move_context(self, response: LLMChessMove) -> None:
         if self.analysis_memory == "":
             memory_addition = f"{response.move}: {response.reasoning}"
