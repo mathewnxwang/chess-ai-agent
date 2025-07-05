@@ -29,5 +29,15 @@ def convert_board_to_pgn(board: chess.Board) -> str:
     
     moves_only = '\n'.join(lines[moves_start:]).strip()
     
-    logger.debug("PGN string constructed for the LLM: \n" + moves_only)
-    return moves_only
+    # Add current board state snapshot
+    board_state = f"""Current Board State:
+FEN: {board.fen()}
+
+Board Position:
+{str(board)}
+
+Game Moves:
+{moves_only}"""
+    
+    logger.debug("PGN string constructed for the LLM: \n" + board_state)
+    return board_state
