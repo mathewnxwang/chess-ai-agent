@@ -1,5 +1,6 @@
 import os
 import chess
+from dotenv import load_dotenv
 from app.llm import LLMManager
 from app.llm_resource import (
     Decision,
@@ -7,17 +8,18 @@ from app.llm_resource import (
     LLMChessMove,
 )
 from app.prompts import (
-    ORCHESTRATION_SYSTEM_PROMPT,
-    ORCHESTRATION_USER_PROMPT,
-    USER_PROMPT_WITH_ERROR,
-    USER_PROMPT,
+    BASE_MOVE_PROMPT,
     SYSTEM_PROMPT,
+    ORCHESTRATION_USER_PROMPT,
     CONSIDER_NEW_MOVE_USER_PROMPT,
     DECIDE_ON_MOVE_USER_PROMPT,
 )
 from langfuse import observe, get_client
 
+load_dotenv("secrets.env")
+
 langfuse = get_client()
+
 
 class ChessAgent():
     def __init__(self, model: str = "gpt-4o"):
@@ -67,7 +69,7 @@ class ChessAgent():
         if decision.decision == DecisionOptions.DECIDE_ON_MOVE:
             langfuse.update_current_span(
                 metadata={
-                    "decision": f"Agent decided to choose a move based on their analysis.",
+                    "decision": "Agent decided to choose a move based on their analysis.",
                     "game_memory": self.game_memory,
                     "analysis_memory": self.analysis_memory,
                 }
@@ -89,7 +91,7 @@ class ChessAgent():
         if decision.decision == DecisionOptions.CONSIDER_NEW_MOVE:
             langfuse.update_current_span(
                 metadata={
-                    "decision": f"Agent decided to consider a new move.",
+                    "decision": "Agent decided to consider a new move.",
                     "game_memory": self.game_memory,
                     "analysis_memory": self.analysis_memory,
                 }
@@ -109,21 +111,24 @@ class ChessAgent():
 
         llm_response = self.llm_manager.call_llm(
             model=self.model,
-            system_prompt=ORCHESTRATION_SYSTEM_PROMPT,
+            system_prompt=SYSTEM_PROMPT,
             user_prompt=formatted_user_prompt,
             response_format=Decision,
         )
 
-        langfuse.update_current_span(metadata={"user_prompt": formatted_user_prompt, "system_prompt": ORCHESTRATION_SYSTEM_PROMPT})
+        langfuse.update_current_span(metadata={"user_prompt": formatted_user_prompt, "system_prompt": SYSTEM_PROMPT})
 
         return llm_response
 
     @observe()
     def consider_new_move(self, position: str) -> LLMChessMove:
-        formatted_user_prompt = CONSIDER_NEW_MOVE_USER_PROMPT.format(
+        base_move_prompt = BASE_MOVE_PROMPT.format(
             position=position,
             previous_moves=self.game_memory,
-            considered_moves=self.analysis_memory
+        )
+        formatted_user_prompt = CONSIDER_NEW_MOVE_USER_PROMPT.format(
+            base_move_prompt=base_move_prompt,
+            considered_moves=self.analysis_memory,
         )
       
         response = self.llm_manager.call_llm(
@@ -141,10 +146,13 @@ class ChessAgent():
 
     @observe()
     def decide_on_move(self, position: str) -> LLMChessMove:
-        formatted_user_prompt = DECIDE_ON_MOVE_USER_PROMPT.format(
+        base_move_prompt = BASE_MOVE_PROMPT.format(
             position=position,
             previous_moves=self.game_memory,
-            considered_moves=self.analysis_memory
+        )
+        formatted_user_prompt = DECIDE_ON_MOVE_USER_PROMPT.format(
+            base_move_prompt=base_move_prompt,
+            considered_moves=self.analysis_memory,
         )
 
         response = self.llm_manager.call_llm(
