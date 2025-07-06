@@ -3,9 +3,10 @@ import chess
 from dotenv import load_dotenv
 from app.llm import LLMManager
 from app.llm_resource import (
+    AnalysisLLMChessMove,
     Decision,
     DecisionOptions,
-    LLMChessMove,
+    BaseLLMChessMove,
 )
 from app.prompts import (
     BASE_MOVE_PROMPT,
@@ -59,7 +60,7 @@ class ChessAgent():
         raise Exception("Unable to make a move.")
 
     @observe()
-    def orchestrate_action(self, position: str, iterations: int) -> LLMChessMove | None:
+    def orchestrate_action(self, position: str, iterations: int) -> BaseLLMChessMove | None:
 
         decision = self.decide_on_action(position=position)
 
@@ -131,7 +132,7 @@ class ChessAgent():
         return llm_response
 
     @observe()
-    def consider_new_move(self, position: str) -> LLMChessMove:
+    def consider_new_move(self, position: str) -> AnalysisLLMChessMove:
 
         if self.game_memory == "":
             previous_moves = "No moves have been made yet."
@@ -157,7 +158,7 @@ class ChessAgent():
             model=self.model,
             system_prompt=SYSTEM_PROMPT,
             user_prompt=formatted_user_prompt,
-            response_format=LLMChessMove,
+            response_format=AnalysisLLMChessMove,
         )
 
         self.update_move_context(response=response)
@@ -167,7 +168,7 @@ class ChessAgent():
         return response
 
     @observe()
-    def decide_on_move(self, position: str, decision_reasoning: str | None = None) -> LLMChessMove:
+    def decide_on_move(self, position: str, decision_reasoning: str | None = None) -> BaseLLMChessMove:
 
         if self.game_memory == "":
             previous_moves = "No moves have been made yet."
@@ -194,14 +195,14 @@ class ChessAgent():
             model=self.model,
             system_prompt=SYSTEM_PROMPT,
             user_prompt=formatted_user_prompt,
-            response_format=LLMChessMove,
+            response_format=BaseLLMChessMove,
         )
 
         langfuse.update_current_span(metadata={"user_prompt": formatted_user_prompt, "system_prompt": SYSTEM_PROMPT})
 
         return response
 
-    def update_move_context(self, response: LLMChessMove) -> None:
+    def update_move_context(self, response: AnalysisLLMChessMove) -> None:
         if self.analysis_memory == "":
             memory_addition = f"{response.move}: {response.reasoning}"
         else:
