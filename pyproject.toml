@@ -19,6 +19,9 @@ langfuse = "^3.0.8"
 [tool.poetry.group.dev.dependencies]
 isort = "^6.0.1"
 
+[tool.pylint.messages_control]
+disable = "missing-class-docstring"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
