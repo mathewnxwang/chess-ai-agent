@@ -26,10 +26,29 @@ class ChessAgent():
     def __init__(self, model: str = "gpt-4o"):
         self.llm_manager = LLMManager()
         self.game_memory: list[str] = []
-        self.analysis_memory = ""
+        self.analysis_memory: list[str] = []
         self.model = model
         self.max_moves_to_consider = 3
 
+    def _get_previous_moves(self) -> str:
+        if not self.game_memory:
+            return "No moves have been made yet."
+        # only inject the last 3 game moves
+        return "\n".join(self.game_memory[-3:])
+
+    def _get_considered_moves(self) -> str:
+        if not self.analysis_memory:
+            return "No moves have been considered yet."
+        return "\n".join(self.analysis_memory)
+
+    def _update_analysis_memory(self, move: AnalysisLLMChessMove) -> None:
+        self.analysis_memory.append(f"{move.move}: {move.reasoning}")
+
+    def _clear_analysis_memory(self) -> None:
+        self.analysis_memory = []
+    
+    def _update_game_memory(self, move: BaseLLMChessMove) -> None:
+        self.game_memory.append(f"{move.move}: {move.reasoning}")
 
     @observe()
     def make_valid_move(self, board: chess.Board, position: str) -> tuple[chess.Move, str]:
@@ -52,16 +71,8 @@ class ChessAgent():
     @observe()
     def decide_on_action(self, position: str) -> Decision:
 
-        if self.game_memory == "":
-            previous_moves = "No moves have been made yet."
-        else:
-            # only inject the last 3 game moves
-            previous_moves = "\n".join(self.game_memory[-3:])
-        
-        if self.analysis_memory == "":
-            considered_moves = "No moves have been considered yet."
-        else:
-            considered_moves = self.analysis_memory
+        previous_moves = self._get_previous_moves()
+        considered_moves = self._get_considered_moves()
 
         formatted_user_prompt = ORCHESTRATION_USER_PROMPT.format(
             position=position,
@@ -130,26 +141,16 @@ class ChessAgent():
                 "analysis_memory": self.analysis_memory,
             }
         )
-        # clear the analysis memory after a move is made
-        self.analysis_memory = ""
-        # update the game memory with the actual move made
-        self.game_memory.append(f"{move.move}: {move.reasoning}")
+        self._update_game_memory(move)
+        self._clear_analysis_memory()
 
         return move_object, move.reasoning
 
     @observe()
     def decide_on_move(self, position: str, decision_reasoning: str | None = None) -> BaseLLMChessMove:
 
-        if self.game_memory == "":
-            previous_moves = "No moves have been made yet."
-        else:
-            # only inject the last 3 game moves
-            previous_moves = "\n".join(self.game_memory[-3:])
-        
-        if self.analysis_memory == "":
-            considered_moves = "No moves have been considered yet."
-        else:
-            considered_moves = self.analysis_memory
+        previous_moves = self._get_previous_moves()
+        considered_moves = self._get_considered_moves()
 
         base_move_prompt = BASE_MOVE_PROMPT.format(
             position=position,
@@ -175,16 +176,8 @@ class ChessAgent():
     @observe()
     def consider_new_move(self, position: str) -> AnalysisLLMChessMove:
 
-        if self.game_memory == "":
-            previous_moves = "No moves have been made yet."
-        else:
-            # only inject the last 3 game moves
-            previous_moves = "\n".join(self.game_memory[-3:])
-        
-        if self.analysis_memory == "":
-            considered_moves = "No moves have been considered yet."
-        else:
-            considered_moves = self.analysis_memory
+        previous_moves = self._get_previous_moves()
+        considered_moves = self._get_considered_moves()
 
         base_move_prompt = BASE_MOVE_PROMPT.format(
             position=position,
@@ -202,18 +195,10 @@ class ChessAgent():
             response_format=AnalysisLLMChessMove,
         )
 
-        self.update_move_context(response=response)
+        self._update_analysis_memory(response)
 
         langfuse.update_current_span(metadata={"user_prompt": formatted_user_prompt, "system_prompt": SYSTEM_PROMPT})
 
         return response
 
-    def update_move_context(self, response: AnalysisLLMChessMove) -> None:
-        if self.analysis_memory == "":
-            memory_addition = f"{response.move}: {response.reasoning}"
-        else:
-            memory_addition = f"\n\n{response.move}: {response.reasoning}"
-
-        self.analysis_memory += memory_addition
-        langfuse.update_current_span(metadata={"analysis_memory_added": memory_addition, "new_analysis_memory": self.analysis_memory})
 
