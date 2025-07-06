@@ -24,7 +24,7 @@ langfuse = get_client()
 class ChessAgent():
     def __init__(self, model: str = "gpt-4o"):
         self.llm_manager = LLMManager()
-        self.game_memory = ""
+        self.game_memory = []
         self.analysis_memory = ""
         self.model = model
         self.max_moves_to_consider = 3
@@ -49,17 +49,14 @@ class ChessAgent():
                 # clear the analysis memory after a move is made
                 self.analysis_memory = ""
                 # update the game memory with the actual move made
-                if self.game_memory == "":
-                    self.game_memory += f"{move}: {decision.reasoning}"
-                else:
-                    self.game_memory += f"\n\n{move}: {decision.reasoning}"
+                self.game_memory.append(f"{move}: {decision.reasoning}")
                 return move, decision.reasoning
             
             # safety check to prevent infinite loop
             if iterations > 5:
-                raise Exception(f"Unable to make a move.")
+                raise Exception("Unable to make a move.")
 
-        raise Exception(f"Unable to make a move.")
+        raise Exception("Unable to make a move.")
 
     @observe()
     def orchestrate_action(self, position: str, iterations: int) -> LLMChessMove | None:
@@ -108,7 +105,8 @@ class ChessAgent():
         if self.game_memory == "":
             previous_moves = "No moves have been made yet."
         else:
-            previous_moves = self.game_memory
+            # only inject the last 3 game moves
+            previous_moves = "\n".join(self.game_memory[-3:])
         
         if self.analysis_memory == "":
             considered_moves = "No moves have been considered yet."
@@ -138,7 +136,8 @@ class ChessAgent():
         if self.game_memory == "":
             previous_moves = "No moves have been made yet."
         else:
-            previous_moves = self.game_memory
+            # only inject the last 3 game moves
+            previous_moves = "\n".join(self.game_memory[-3:])
         
         if self.analysis_memory == "":
             considered_moves = "No moves have been considered yet."
@@ -173,7 +172,8 @@ class ChessAgent():
         if self.game_memory == "":
             previous_moves = "No moves have been made yet."
         else:
-            previous_moves = self.game_memory
+            # only inject the last 3 game moves
+            previous_moves = "\n".join(self.game_memory[-3:])
         
         if self.analysis_memory == "":
             considered_moves = "No moves have been considered yet."

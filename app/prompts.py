@@ -58,7 +58,7 @@ BASE_MOVE_PROMPT = """Given the position in PGN format, choose the best, valid n
 {position}
 </position>
 
-These are the moves you have already played and why you played them:
+These are the recent moves you have already played and why you played them:
 <previous_moves>
 {previous_moves}
 </previous_moves>
